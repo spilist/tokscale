@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Token Tracker CLI
- * Display OpenCode and Claude Code usage with dynamic width tables
+ * Display OpenCode, Claude Code, and Codex usage with dynamic width tables
  */
 
 import { Command } from "commander";
@@ -16,7 +16,7 @@ import {
   formatModelName,
 } from "./table.js";
 import { readOpenCodeMessages, aggregateOpenCodeByModel } from "./opencode.js";
-import { readClaudeCodeSessions } from "./claudecode.js";
+import { readClaudeCodeSessions, readCodexSessions } from "./claudecode.js";
 
 interface UsageSummary {
   source: string;
@@ -30,19 +30,26 @@ interface UsageSummary {
   cost: number;
 }
 
+interface FilterOptions {
+  opencode?: boolean;
+  claude?: boolean;
+  codex?: boolean;
+}
+
 async function main() {
   const program = new Command();
 
   program
     .name("token-tracker")
-    .description("Calculate token prices from OpenCode and Claude Code sessions")
+    .description("Calculate token prices from OpenCode, Claude Code, and Codex sessions")
     .version("1.0.0");
 
   program
     .command("monthly")
     .description("Show monthly usage report")
     .option("--opencode", "Show only OpenCode usage")
-    .option("--claudecode", "Show only Claude Code usage")
+    .option("--claude", "Show only Claude Code usage")
+    .option("--codex", "Show only Codex CLI usage")
     .action(async (options) => {
       await showMonthlyReport(options);
     });
@@ -51,7 +58,8 @@ async function main() {
     .command("models")
     .description("Show usage breakdown by model")
     .option("--opencode", "Show only OpenCode usage")
-    .option("--claudecode", "Show only Claude Code usage")
+    .option("--claude", "Show only Claude Code usage")
+    .option("--codex", "Show only Codex CLI usage")
     .action(async (options) => {
       await showModelReport(options);
     });
@@ -59,7 +67,8 @@ async function main() {
   // Default command with options
   program
     .option("--opencode", "Show only OpenCode usage")
-    .option("--claudecode", "Show only Claude Code usage")
+    .option("--claude", "Show only Claude Code usage")
+    .option("--codex", "Show only Codex CLI usage")
     .action(async (options) => {
       await showModelReport(options);
     });
@@ -67,7 +76,13 @@ async function main() {
   await program.parseAsync();
 }
 
-async function showModelReport(options: { opencode?: boolean; claudecode?: boolean }) {
+function shouldInclude(options: FilterOptions, source: "opencode" | "claude" | "codex"): boolean {
+  const hasFilter = options.opencode || options.claude || options.codex;
+  if (!hasFilter) return true; // No filter = include all
+  return !!options[source];
+}
+
+async function showModelReport(options: FilterOptions) {
   console.log(pc.cyan("\n  Token Usage Report by Model\n"));
 
   const fetcher = new PricingFetcher();
@@ -76,8 +91,8 @@ async function showModelReport(options: { opencode?: boolean; claudecode?: boole
 
   const summaries: UsageSummary[] = [];
 
-  // OpenCode data
-  if (!options.claudecode) {
+  // OpenCode data (~/.local/share/opencode/)
+  if (shouldInclude(options, "opencode")) {
     const openCodeMessages = readOpenCodeMessages();
     if (openCodeMessages.length > 0) {
       const openCodeData = aggregateOpenCodeByModel(openCodeMessages);
@@ -112,8 +127,8 @@ async function showModelReport(options: { opencode?: boolean; claudecode?: boole
     }
   }
 
-  // Claude Code data
-  if (!options.opencode) {
+  // Claude Code data (~/.claude/projects/)
+  if (shouldInclude(options, "claude")) {
     const claudeCodeData = readClaudeCodeSessions();
     if (claudeCodeData.length > 0) {
       for (const data of claudeCodeData) {
@@ -123,22 +138,54 @@ async function showModelReport(options: { opencode?: boolean; claudecode?: boole
               {
                 input: data.input,
                 output: data.output,
-                reasoning: data.reasoning,
-                cacheRead: data.cachedInput,
-                cacheWrite: 0,
+                cacheRead: data.cacheRead,
+                cacheWrite: data.cacheWrite,
               },
               pricing
             )
           : 0;
 
         summaries.push({
-          source: "Claude Code",
+          source: "Claude",
           model: data.model,
           input: data.input,
           output: data.output,
-          cacheRead: data.cachedInput,
-          cacheWrite: 0,
-          reasoning: data.reasoning,
+          cacheRead: data.cacheRead,
+          cacheWrite: data.cacheWrite,
+          reasoning: 0,
+          messageCount: data.messageCount,
+          cost,
+        });
+      }
+    }
+  }
+
+  // Codex CLI data (~/.codex/sessions/)
+  if (shouldInclude(options, "codex")) {
+    const codexData = readCodexSessions();
+    if (codexData.length > 0) {
+      for (const data of codexData) {
+        const pricing = fetcher.getModelPricing(data.model);
+        const cost = pricing
+          ? fetcher.calculateCost(
+              {
+                input: data.input,
+                output: data.output,
+                cacheRead: data.cacheRead,
+                cacheWrite: data.cacheWrite,
+              },
+              pricing
+            )
+          : 0;
+
+        summaries.push({
+          source: "Codex",
+          model: data.model,
+          input: data.input,
+          output: data.output,
+          cacheRead: data.cacheRead,
+          cacheWrite: data.cacheWrite,
+          reasoning: 0,
           messageCount: data.messageCount,
           cost,
         });
@@ -199,7 +246,7 @@ async function showModelReport(options: { opencode?: boolean; claudecode?: boole
   );
 }
 
-async function showMonthlyReport(options: { opencode?: boolean; claudecode?: boolean }) {
+async function showMonthlyReport(options: FilterOptions) {
   console.log(pc.cyan("\n  Monthly Token Usage Report\n"));
 
   const fetcher = new PricingFetcher();
@@ -220,7 +267,7 @@ async function showMonthlyReport(options: { opencode?: boolean; claudecode?: boo
   >();
 
   // OpenCode data
-  if (!options.claudecode) {
+  if (shouldInclude(options, "opencode")) {
     const openCodeMessages = readOpenCodeMessages();
     for (const msg of openCodeMessages) {
       if (!msg.tokens || !msg.modelID) continue;
@@ -262,6 +309,9 @@ async function showMonthlyReport(options: { opencode?: boolean; claudecode?: boo
       }
     }
   }
+
+  // TODO: Add Claude Code and Codex monthly aggregation
+  // (would need timestamp data from those sources)
 
   if (monthlyData.size === 0) {
     console.log(pc.yellow("  No usage data found.\n"));

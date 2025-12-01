@@ -1,5 +1,5 @@
 /**
- * Claude Code (Codex) session data reader
+ * Claude Code (Anthropic official) and Codex CLI data readers
  */
 
 import * as fs from "node:fs";
@@ -7,16 +7,88 @@ import * as path from "node:path";
 import * as os from "node:os";
 
 export interface ClaudeCodeUsageData {
-  source: "claudecode";
+  source: "claude" | "codex";
   model: string;
   messageCount: number;
   input: number;
   output: number;
-  cachedInput: number;
-  reasoning: number;
+  cacheRead: number;
+  cacheWrite: number;
 }
 
-interface TokenCountInfo {
+// ============================================================================
+// Claude Code (Anthropic official) - ~/.claude/projects/
+// ============================================================================
+
+export function getClaudeCodeProjectsPath(): string {
+  return path.join(os.homedir(), ".claude", "projects");
+}
+
+export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
+  const projectsPath = getClaudeCodeProjectsPath();
+
+  if (!fs.existsSync(projectsPath)) {
+    return [];
+  }
+
+  const modelUsage = new Map<string, ClaudeCodeUsageData>();
+  const files = findJsonlFiles(projectsPath);
+
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(file, "utf-8");
+      const lines = content.split(/\r?\n/);
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        try {
+          const entry = JSON.parse(trimmed);
+
+          // Process assistant messages with usage data
+          if (entry.type === "assistant" && entry.message?.usage) {
+            const model = entry.message.model || "unknown";
+            const usage = entry.message.usage;
+
+            // Get or create usage data for this model
+            let data = modelUsage.get(model);
+            if (!data) {
+              data = {
+                source: "claude",
+                model,
+                messageCount: 0,
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+              };
+              modelUsage.set(model, data);
+            }
+
+            data.messageCount++;
+            data.input += usage.input_tokens || 0;
+            data.output += usage.output_tokens || 0;
+            data.cacheRead += usage.cache_read_input_tokens || 0;
+            data.cacheWrite += usage.cache_creation_input_tokens || 0;
+          }
+        } catch {
+          // Skip malformed lines
+        }
+      }
+    } catch {
+      // Skip unreadable files
+    }
+  }
+
+  return Array.from(modelUsage.values());
+}
+
+// ============================================================================
+// Codex CLI (OpenAI) - ~/.codex/sessions/
+// ============================================================================
+
+interface CodexTokenCountInfo {
   last_token_usage?: {
     input_tokens?: number;
     cached_input_tokens?: number;
@@ -37,13 +109,13 @@ interface TokenCountInfo {
   model_name?: string;
 }
 
-export function getClaudeCodeSessionsPath(): string {
+export function getCodexSessionsPath(): string {
   const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
   return path.join(codexHome, "sessions");
 }
 
-export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
-  const sessionsPath = getClaudeCodeSessionsPath();
+export function readCodexSessions(): ClaudeCodeUsageData[] {
+  const sessionsPath = getCodexSessionsPath();
 
   if (!fs.existsSync(sessionsPath)) {
     return [];
@@ -62,7 +134,6 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
         input: number;
         cached: number;
         output: number;
-        reasoning: number;
       } | null = null;
 
       for (const line of lines) {
@@ -81,7 +152,7 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
 
           // Process token_count events
           if (entry.type === "event_msg" && entry.payload?.type === "token_count") {
-            const info = entry.payload.info as TokenCountInfo | undefined;
+            const info = entry.payload.info as CodexTokenCountInfo | undefined;
             if (!info) continue;
 
             // Extract model from payload
@@ -98,7 +169,6 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
               input: 0,
               cached: 0,
               output: 0,
-              reasoning: 0,
             };
 
             if (lastUsage) {
@@ -106,7 +176,6 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
                 input: lastUsage.input_tokens || 0,
                 cached: lastUsage.cached_input_tokens || lastUsage.cache_read_input_tokens || 0,
                 output: lastUsage.output_tokens || 0,
-                reasoning: lastUsage.reasoning_output_tokens || 0,
               };
             } else if (totalUsage && previousTotals) {
               delta = {
@@ -117,10 +186,6 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
                   0
                 ),
                 output: Math.max((totalUsage.output_tokens || 0) - previousTotals.output, 0),
-                reasoning: Math.max(
-                  (totalUsage.reasoning_output_tokens || 0) - previousTotals.reasoning,
-                  0
-                ),
               };
             }
 
@@ -129,7 +194,6 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
                 input: totalUsage.input_tokens || 0,
                 cached: totalUsage.cached_input_tokens || totalUsage.cache_read_input_tokens || 0,
                 output: totalUsage.output_tokens || 0,
-                reasoning: totalUsage.reasoning_output_tokens || 0,
               };
             }
 
@@ -142,13 +206,13 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
             let usage = modelUsage.get(model);
             if (!usage) {
               usage = {
-                source: "claudecode",
+                source: "codex",
                 model,
                 messageCount: 0,
                 input: 0,
                 output: 0,
-                cachedInput: 0,
-                reasoning: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
               };
               modelUsage.set(model, usage);
             }
@@ -156,8 +220,7 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
             usage.messageCount++;
             usage.input += delta.input;
             usage.output += delta.output;
-            usage.cachedInput += delta.cached;
-            usage.reasoning += delta.reasoning;
+            usage.cacheRead += delta.cached;
           }
         } catch {
           // Skip malformed lines
@@ -171,18 +234,26 @@ export function readClaudeCodeSessions(): ClaudeCodeUsageData[] {
   return Array.from(modelUsage.values());
 }
 
+// ============================================================================
+// Utilities
+// ============================================================================
+
 function findJsonlFiles(dir: string): string[] {
   const files: string[] = [];
 
   function walk(currentDir: string) {
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
-        files.push(fullPath);
+    try {
+      const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          walk(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
+          files.push(fullPath);
+        }
       }
+    } catch {
+      // Skip inaccessible directories
     }
   }
 

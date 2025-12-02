@@ -14,8 +14,8 @@ noop = ["napi/noop", "napi-derive/noop"]
 
 [dependencies]
 # NAPI-RS for Node.js bindings
-napi = { version = "2", default-features = false, features = ["async", "napi8", "serde-json", "noop"] }
-napi-derive = { version = "2", features = ["noop"] }
+napi = { version = "2", default-features = false, features = ["async", "napi8", "serde-json"] }
+napi-derive = "2"
 
 # Parallelism
 rayon = "1.10"

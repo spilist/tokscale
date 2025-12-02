@@ -9,7 +9,15 @@
   "scripts": {
     "build": "tsx src/cli.ts",
     "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "build:core": "cd core && yarn build",
+    "build:core:debug": "cd core && yarn build:debug",
+    "build:core:release": "cd core && yarn build",
+    "bench:generate": "tsx benchmarks/generate.ts",
+    "bench:ts": "tsx benchmarks/runner.ts",
+    "bench:ts:synthetic": "tsx benchmarks/runner.ts --synthetic --iterations 5 --warmup 1",
+    "bench:rust": "tsx benchmarks/runner.ts --implementation rust",
+    "bench:rust:synthetic": "tsx benchmarks/runner.ts --implementation rust --synthetic --iterations 5 --warmup 1"
   },
   "dependencies": {
     "cli-table3": "^0.6.5",
@@ -19,6 +27,7 @@
     "string-width": "^8.1.0"
   },
   "devDependencies": {
+    "@napi-rs/cli": "^3.4.1",
     "@types/node": "^20.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"

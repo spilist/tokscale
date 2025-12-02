@@ -1,0 +1,45 @@
+[package]
+name = "token-tracker-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Native Rust core for token-tracker CLI - high-performance session parsing"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# NAPI-RS for Node.js bindings
+napi = { version = "2", default-features = false, features = ["async", "napi8", "serde-json"] }
+napi-derive = "2"
+
+# Parallelism
+rayon = "1.10"
+
+# JSON parsing (with SIMD acceleration)
+simd-json = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# File system traversal
+walkdir = "2"
+globset = "0.4"
+
+# Date/time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+[build-dependencies]
+napi-build = "2"
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 1

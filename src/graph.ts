@@ -3,6 +3,10 @@
  * Aggregates token usage data by date for contribution graph visualization
  *
  * Key design: intensity is calculated based on COST ($), not tokens
+ * 
+ * This module supports two implementations:
+ * - Native Rust (fast, ~10x faster) - used when available
+ * - Pure TypeScript (fallback) - always available
  */
 
 import { format } from "date-fns";
@@ -25,10 +29,48 @@ import type {
 
 const VERSION = "1.0.0";
 
+// Try to load native module
+let nativeModule: typeof import("./native.js") | null = null;
+try {
+  nativeModule = await import("./native.js");
+} catch {
+  // Native module not available, will use TypeScript implementation
+}
+
+/**
+ * Check if native implementation is available
+ */
+export function isNativeAvailable(): boolean {
+  return nativeModule?.isNativeAvailable() ?? false;
+}
+
 /**
  * Generate contribution graph data from all sources
+ * 
+ * Uses native Rust implementation if available, falls back to TypeScript.
+ * Set `options.forceTypescript = true` to skip native module.
  */
 export async function generateGraphData(
+  options: GraphOptions & { forceTypescript?: boolean } = {}
+): Promise<TokenContributionData> {
+  // Try native implementation first (unless forced to use TypeScript)
+  if (!options.forceTypescript && nativeModule?.isNativeAvailable()) {
+    try {
+      return nativeModule.generateGraphNative(options);
+    } catch (e) {
+      // Fall through to TypeScript implementation
+      console.warn("Native module failed, falling back to TypeScript:", e);
+    }
+  }
+  
+  // TypeScript implementation
+  return generateGraphDataTS(options);
+}
+
+/**
+ * Pure TypeScript implementation of graph data generation
+ */
+export async function generateGraphDataTS(
   options: GraphOptions = {}
 ): Promise<TokenContributionData> {
   const fetcher = new PricingFetcher();

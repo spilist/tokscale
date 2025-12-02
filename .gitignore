@@ -1,2 +1,11 @@
 .DS_Store
 node_modules
+dist/
+
+# Benchmark results (except .gitkeep)
+benchmarks/results/*
+!benchmarks/results/.gitkeep
+benchmarks/synthetic-data/
+
+target/
+*.node

@@ -18,8 +18,9 @@ import {
 import { readOpenCodeMessages, aggregateOpenCodeByModel } from "./opencode.js";
 import { readClaudeCodeSessions, readCodexSessions } from "./claudecode.js";
 import { readGeminiSessions } from "./gemini.js";
-import { generateGraphData } from "./graph.js";
+import { generateGraphData, isNativeAvailable } from "./graph.js";
 import * as fs from "node:fs";
+import { performance } from "node:perf_hooks";
 import type { SourceType } from "./graph-types.js";
 
 interface UsageSummary {
@@ -82,6 +83,8 @@ async function main() {
     .option("--since <date>", "Start date (YYYY-MM-DD)")
     .option("--until <date>", "End date (YYYY-MM-DD)")
     .option("--year <year>", "Filter to specific year")
+    .option("--no-native", "Force TypeScript implementation (skip native Rust module)")
+    .option("--benchmark", "Show processing time")
     .action(async (options) => {
       await handleGraphCommand(options);
     });
@@ -424,9 +427,13 @@ interface GraphCommandOptions {
   since?: string;
   until?: string;
   year?: string;
+  native?: boolean; // --no-native sets this to false
+  benchmark?: boolean;
 }
 
 async function handleGraphCommand(options: GraphCommandOptions) {
+  const startTime = performance.now();
+  
   // Determine which sources to include
   const sources: SourceType[] = [];
   const hasSourceFilter = options.opencode || options.claude || options.codex || options.gemini;
@@ -446,7 +453,11 @@ async function handleGraphCommand(options: GraphCommandOptions) {
     since: options.since,
     until: options.until,
     year: options.year,
+    forceTypescript: options.native === false, // --no-native
   });
+
+  const endTime = performance.now();
+  const processingTime = endTime - startTime;
 
   const jsonOutput = JSON.stringify(data, null, 2);
 
@@ -456,6 +467,10 @@ async function handleGraphCommand(options: GraphCommandOptions) {
     console.error(pc.green(`✓ Graph data written to ${options.output}`));
     console.error(pc.gray(`  ${data.contributions.length} days, ${data.summary.sources.length} sources, ${data.summary.models.length} models`));
     console.error(pc.gray(`  Total: ${formatCurrency(data.summary.totalCost)}`));
+    if (options.benchmark) {
+      const impl = options.native === false ? "TypeScript" : (isNativeAvailable() ? "Rust (native)" : "TypeScript");
+      console.error(pc.gray(`  Processing time: ${processingTime.toFixed(0)}ms (${impl})`));
+    }
   } else {
     console.log(jsonOutput);
   }

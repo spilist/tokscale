@@ -1,0 +1,53 @@
+{
+  "name": "@token-tracker/core",
+  "version": "0.1.0",
+  "description": "Native Rust core for token-tracker CLI - high-performance session parsing",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "binaryName": "token-tracker-core",
+    "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl",
+      "x86_64-pc-windows-msvc",
+      "aarch64-pc-windows-msvc"
+    ]
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@napi-rs/cli": "^3.4.1"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "cargo test",
+    "universal": "napi universal",
+    "version": "napi version"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
+  "engines": {
+    "node": ">= 16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wakeru-ai/token-usage-tracker.git",
+    "directory": "core"
+  },
+  "keywords": [
+    "napi-rs",
+    "rust",
+    "token-tracker",
+    "performance",
+    "native"
+  ]
+}

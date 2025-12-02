@@ -61,9 +61,50 @@ mod tests {
 
     #[test]
     fn test_timestamp_to_date() {
-        // 2025-06-15 12:00:00 UTC
+        // 2025-06-16 12:00:00 UTC (1750075200 seconds since epoch)
         let ts = 1750075200000_i64;
         let date = timestamp_to_date(ts);
-        assert_eq!(date, "2025-06-15");
+        assert_eq!(date, "2025-06-16");
+    }
+
+    #[test]
+    fn test_timestamp_to_date_epoch() {
+        // Unix epoch: 1970-01-01
+        let ts = 0_i64;
+        let date = timestamp_to_date(ts);
+        assert_eq!(date, "1970-01-01");
+    }
+
+    #[test]
+    fn test_timestamp_to_date_recent() {
+        // 2024-12-01 00:00:00 UTC
+        let ts = 1733011200000_i64;
+        let date = timestamp_to_date(ts);
+        assert_eq!(date, "2024-12-01");
+    }
+
+    #[test]
+    fn test_unified_message_creation() {
+        let tokens = TokenBreakdown {
+            input: 100,
+            output: 50,
+            cache_read: 0,
+            cache_write: 0,
+            reasoning: 0,
+        };
+        
+        let msg = UnifiedMessage::new(
+            "opencode",
+            "claude-3-5-sonnet",
+            "anthropic",
+            1733011200000,
+            tokens,
+            0.05,
+        );
+        
+        assert_eq!(msg.source, "opencode");
+        assert_eq!(msg.model_id, "claude-3-5-sonnet");
+        assert_eq!(msg.date, "2024-12-01");
+        assert_eq!(msg.cost, 0.05);
     }
 }

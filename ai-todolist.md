@@ -33,7 +33,7 @@
 - [x] 3.2 Implement `scan_directory()` with walkdir
 - [x] 3.3 Implement `scan_all_sources()` with parallel iteration
 - [x] 3.4 Add NAPI export for scanner
-- [ ] 3.5 Write scanner unit tests
+- [x] 3.5 Write scanner unit tests (20+ tests in scanner.rs)
 
 ## Phase 4: SIMD JSON Parser
 
@@ -41,7 +41,7 @@
 - [x] 4.2 Implement `parse_jsonl_file()` for streaming
 - [x] 4.3 Implement `parse_batch()` with Rayon
 - [x] 4.4 Add error handling (skip malformed files)
-- [ ] 4.5 Benchmark SIMD vs serde_json
+- [x] 4.5 Benchmark SIMD vs serde_json (benches/json_parsing.rs)
 
 ## Phase 5: Session Parsers (Rust)
 
@@ -51,7 +51,7 @@
 - [x] 5.4 Implement `codex.rs` parser (stateful)
 - [x] 5.5 Implement `gemini.rs` parser
 - [x] 5.6 Implement `collect_all_messages()`
-- [ ] 5.7 Add integration tests for parsers
+- [x] 5.7 Add integration tests for parsers (11 AVA tests in __test__/)
 
 ## Phase 6: Parallel Aggregation
 
@@ -76,14 +76,14 @@
 - [x] 8.1 Create `.github/workflows/build-native.yml`
 - [x] 8.2 Add benchmark step to CI
 - [x] 8.3 Configure artifact upload
-- [ ] 8.4 Add npm publish workflow (optional - for package release)
-- [ ] 8.5 Update main workflow for both TS and native tests (optional)
+- [x] 8.4 Add npm publish workflow (triggered on v* tags)
+- [x] 8.5 Update main workflow for both TS and native tests
 
 ---
 
 ## 현재 진행 중인 작업
 
-**All Core Phases Complete!** Project is ready for use.
+**ALL PHASES COMPLETE!** Project fully implemented with tests, benchmarks, and CI/CD.
 
 ---
 
@@ -106,4 +106,6 @@
 | 2025-12-02 | Phase 7 TS integration | ✅ | native.ts, CLI flags, graph.ts integration |
 | 2025-12-02 | **PHASES 3-7 COMPLETE** | ✅ | Native module fully working, ~45% less memory |
 | 2025-12-02 | Phase 8.1-8.3 CI/CD | ✅ | build-native.yml with multi-platform builds |
-| 2025-12-02 | **PHASE 8 CORE COMPLETE** | ✅ | CI/CD with builds, tests, benchmarks |
+| 2025-12-02 | 3.5, 4.5, 5.7 Tests | ✅ | 34 Rust tests + 11 AVA integration tests |
+| 2025-12-02 | 8.4-8.5 CI/CD complete | ✅ | npm publish workflow, lint, test jobs |
+| 2025-12-02 | **ALL PHASES COMPLETE** | ✅ | Full implementation with tests & CI/CD |

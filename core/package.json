@@ -19,16 +19,27 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@napi-rs/cli": "^3.4.1"
+    "@napi-rs/cli": "^3.4.1",
+    "ava": "^6.1.0"
   },
   "scripts": {
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "cargo test",
+    "test": "ava",
+    "test:rust": "cargo test --features noop",
+    "test:all": "yarn test:rust && yarn test",
+    "bench": "cargo bench --features noop",
     "universal": "napi universal",
     "version": "napi version"
+  },
+  "ava": {
+    "timeout": "2m",
+    "workerThreads": false,
+    "files": [
+      "__test__/**/*.spec.mjs"
+    ]
   },
   "files": [
     "index.js",

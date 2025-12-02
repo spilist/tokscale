@@ -149,6 +149,9 @@ pub fn scan_all_sources(home_dir: &str, sources: &[String]) -> ScanResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use tempfile::TempDir;
 
     #[test]
     fn test_scan_result_total_files() {
@@ -159,5 +162,213 @@ mod tests {
             gemini_files: vec![PathBuf::from("d.json")],
         };
         assert_eq!(result.total_files(), 4);
+    }
+
+    #[test]
+    fn test_scan_result_all_files() {
+        let result = ScanResult {
+            opencode_files: vec![PathBuf::from("a.json")],
+            claude_files: vec![PathBuf::from("b.jsonl")],
+            codex_files: vec![PathBuf::from("c.jsonl")],
+            gemini_files: vec![PathBuf::from("d.json")],
+        };
+        
+        let all = result.all_files();
+        assert_eq!(all.len(), 4);
+        assert_eq!(all[0], (SessionType::OpenCode, PathBuf::from("a.json")));
+        assert_eq!(all[1], (SessionType::Claude, PathBuf::from("b.jsonl")));
+        assert_eq!(all[2], (SessionType::Codex, PathBuf::from("c.jsonl")));
+        assert_eq!(all[3], (SessionType::Gemini, PathBuf::from("d.json")));
+    }
+
+    #[test]
+    fn test_scan_result_empty() {
+        let result = ScanResult::default();
+        assert_eq!(result.total_files(), 0);
+        assert!(result.all_files().is_empty());
+    }
+
+    #[test]
+    fn test_session_type_equality() {
+        assert_eq!(SessionType::OpenCode, SessionType::OpenCode);
+        assert_ne!(SessionType::OpenCode, SessionType::Claude);
+    }
+
+    #[test]
+    fn test_scan_directory_json_pattern() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path();
+
+        // Create test files
+        File::create(path.join("test1.json")).unwrap();
+        File::create(path.join("test2.json")).unwrap();
+        File::create(path.join("data.txt")).unwrap();
+        File::create(path.join("other.jsonl")).unwrap();
+
+        let json_files = scan_directory(path.to_str().unwrap(), "*.json");
+        assert_eq!(json_files.len(), 2);
+        assert!(json_files.iter().all(|p| p.extension().unwrap() == "json"));
+    }
+
+    #[test]
+    fn test_scan_directory_jsonl_pattern() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path();
+
+        File::create(path.join("session.jsonl")).unwrap();
+        File::create(path.join("log.jsonl")).unwrap();
+        File::create(path.join("data.json")).unwrap();
+
+        let jsonl_files = scan_directory(path.to_str().unwrap(), "*.jsonl");
+        assert_eq!(jsonl_files.len(), 2);
+        assert!(jsonl_files.iter().all(|p| p.extension().unwrap() == "jsonl"));
+    }
+
+    #[test]
+    fn test_scan_directory_session_pattern() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path();
+
+        File::create(path.join("session-001.json")).unwrap();
+        File::create(path.join("session-abc.json")).unwrap();
+        File::create(path.join("other.json")).unwrap();
+        File::create(path.join("session.json")).unwrap(); // Shouldn't match
+
+        let session_files = scan_directory(path.to_str().unwrap(), "session-*.json");
+        assert_eq!(session_files.len(), 2);
+        assert!(session_files.iter().all(|p| {
+            let name = p.file_name().unwrap().to_str().unwrap();
+            name.starts_with("session-") && name.ends_with(".json")
+        }));
+    }
+
+    #[test]
+    fn test_scan_directory_nested() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path();
+
+        // Create nested structure
+        let sub1 = path.join("project1");
+        let sub2 = path.join("project2");
+        fs::create_dir_all(&sub1).unwrap();
+        fs::create_dir_all(&sub2).unwrap();
+
+        File::create(sub1.join("session.json")).unwrap();
+        File::create(sub2.join("session.json")).unwrap();
+        File::create(path.join("root.json")).unwrap();
+
+        let files = scan_directory(path.to_str().unwrap(), "*.json");
+        assert_eq!(files.len(), 3);
+    }
+
+    #[test]
+    fn test_scan_directory_nonexistent() {
+        let files = scan_directory("/nonexistent/path/that/does/not/exist", "*.json");
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn test_scan_directory_empty() {
+        let dir = TempDir::new().unwrap();
+        let files = scan_directory(dir.path().to_str().unwrap(), "*.json");
+        assert!(files.is_empty());
+    }
+
+    fn setup_mock_opencode_dir(base: &std::path::Path) {
+        let opencode_path = base.join(".local/share/opencode/storage/message/proj1");
+        fs::create_dir_all(&opencode_path).unwrap();
+        let mut file = File::create(opencode_path.join("msg_001.json")).unwrap();
+        file.write_all(b"{}").unwrap();
+    }
+
+    fn setup_mock_claude_dir(base: &std::path::Path) {
+        let claude_path = base.join(".claude/projects/myproject");
+        fs::create_dir_all(&claude_path).unwrap();
+        let mut file = File::create(claude_path.join("conversation.jsonl")).unwrap();
+        file.write_all(b"").unwrap();
+    }
+
+    fn setup_mock_codex_dir(base: &std::path::Path) {
+        let codex_path = base.join(".codex/sessions");
+        fs::create_dir_all(&codex_path).unwrap();
+        let mut file = File::create(codex_path.join("session.jsonl")).unwrap();
+        file.write_all(b"").unwrap();
+    }
+
+    fn setup_mock_gemini_dir(base: &std::path::Path) {
+        let gemini_path = base.join(".gemini/tmp/123/chats");
+        fs::create_dir_all(&gemini_path).unwrap();
+        let mut file = File::create(gemini_path.join("session-abc.json")).unwrap();
+        file.write_all(b"{}").unwrap();
+    }
+
+    #[test]
+    fn test_scan_all_sources_opencode() {
+        let dir = TempDir::new().unwrap();
+        let home = dir.path();
+        setup_mock_opencode_dir(home);
+
+        // Set XDG_DATA_HOME for the test
+        std::env::set_var("XDG_DATA_HOME", home.join(".local/share"));
+
+        let result = scan_all_sources(home.to_str().unwrap(), &["opencode".to_string()]);
+        assert_eq!(result.opencode_files.len(), 1);
+        assert!(result.claude_files.is_empty());
+        assert!(result.codex_files.is_empty());
+        assert!(result.gemini_files.is_empty());
+    }
+
+    #[test]
+    fn test_scan_all_sources_claude() {
+        let dir = TempDir::new().unwrap();
+        let home = dir.path();
+        setup_mock_claude_dir(home);
+
+        let result = scan_all_sources(home.to_str().unwrap(), &["claude".to_string()]);
+        assert_eq!(result.claude_files.len(), 1);
+        assert!(result.opencode_files.is_empty());
+    }
+
+    #[test]
+    fn test_scan_all_sources_gemini() {
+        let dir = TempDir::new().unwrap();
+        let home = dir.path();
+        setup_mock_gemini_dir(home);
+
+        let result = scan_all_sources(home.to_str().unwrap(), &["gemini".to_string()]);
+        assert_eq!(result.gemini_files.len(), 1);
+        assert!(result.opencode_files.is_empty());
+    }
+
+    #[test]
+    fn test_scan_all_sources_multiple() {
+        let dir = TempDir::new().unwrap();
+        let home = dir.path();
+        
+        setup_mock_claude_dir(home);
+        setup_mock_gemini_dir(home);
+
+        let result = scan_all_sources(
+            home.to_str().unwrap(),
+            &["claude".to_string(), "gemini".to_string()],
+        );
+        
+        assert_eq!(result.claude_files.len(), 1);
+        assert_eq!(result.gemini_files.len(), 1);
+        assert!(result.opencode_files.is_empty());
+        assert!(result.codex_files.is_empty());
+    }
+
+    #[test]
+    fn test_scan_all_sources_codex_with_env() {
+        let dir = TempDir::new().unwrap();
+        let home = dir.path();
+        setup_mock_codex_dir(home);
+
+        // Set CODEX_HOME environment variable
+        std::env::set_var("CODEX_HOME", home.join(".codex"));
+
+        let result = scan_all_sources(home.to_str().unwrap(), &["codex".to_string()]);
+        assert_eq!(result.codex_files.len(), 1);
     }
 }

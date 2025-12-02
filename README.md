@@ -18,10 +18,11 @@ Get real-time pricing calculations using [LiteLLM's pricing data](https://github
 ## Features
 
 - **Multi-platform support** - Track usage across OpenCode, Claude Code, Codex CLI, and Gemini CLI
-- **Real-time pricing** - Fetches current pricing from LiteLLM for accurate cost calculations
+- **Real-time pricing** - Fetches current pricing from LiteLLM with 1-hour disk cache
 - **Detailed breakdowns** - Input, output, cache read/write, and reasoning token tracking
-- **Hybrid architecture** - TypeScript CLI with optional Rust native module for 10x faster processing
+- **Native Rust core** - All parsing and aggregation done in Rust for 10x faster processing
 - **GitHub-style visualization** - Interactive contribution graph with 2D and 3D views
+- **Dark/Light/System themes** - GitHub Primer design system with 3-way theme toggle
 - **Flexible filtering** - Filter by platform, date range, or year
 - **Export to JSON** - Generate data for external visualization tools
 
@@ -110,9 +111,6 @@ token-tracker graph --year 2024
 # Filter by platform
 token-tracker graph --opencode --claude
 
-# Force TypeScript implementation (skip native module)
-token-tracker graph --no-native
-
 # Show processing time benchmark
 token-tracker graph --output data.json --benchmark
 ```
@@ -155,6 +153,7 @@ token-tracker/
 │   │   ├── scanner.rs      # Parallel file discovery
 │   │   ├── parser.rs       # SIMD JSON parsing
 │   │   ├── aggregator.rs   # Parallel aggregation
+│   │   ├── pricing.rs      # Cost calculation with LiteLLM data
 │   │   └── sessions/       # Platform-specific parsers
 │   │       ├── opencode.rs
 │   │       ├── claudecode.rs
@@ -181,19 +180,28 @@ token-tracker/
 
 Token Tracker uses a hybrid architecture for optimal performance:
 
-1. **TypeScript Layer**: CLI interface, command handling, output formatting
-2. **Rust Native Core**: Parallel file scanning, SIMD JSON parsing, aggregation
+1. **TypeScript Layer**: CLI interface, pricing fetch (with disk cache), output formatting
+2. **Rust Native Core**: ALL parsing, cost calculation, and aggregation
 
-The native module is loaded dynamically with automatic fallback to pure TypeScript:
-
-```typescript
-// Automatic fallback if native module unavailable
-if (isNativeAvailable()) {
-  return generateGraphNative(options);  // ~10x faster
-} else {
-  return generateGraphDataTS(options);   // Pure TypeScript
-}
 ```
+┌─────────────────────────────────────────────────────────────┐
+│                     TypeScript (CLI)                        │
+│  • Fetch pricing from LiteLLM (cached to disk, 1hr TTL)     │
+│  • Pass pricing data to Rust                                │
+│  • Display formatted results                                │
+└─────────────────────┬───────────────────────────────────────┘
+                      │ pricing entries
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Rust Native Core                         │
+│  • Parallel file scanning (rayon)                           │
+│  • SIMD JSON parsing (simd-json)                            │
+│  • Cost calculation with pricing data                       │
+│  • Parallel aggregation by model/month/day                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+All heavy computation is done in Rust. The CLI requires the native module to run.
 
 ### Key Technologies
 
@@ -251,11 +259,14 @@ The frontend provides a GitHub-style contribution graph visualization:
 - **2D View**: Classic GitHub contribution calendar
 - **3D View**: Isometric 3D contribution graph with height based on cost
 - **Multiple color palettes**: GitHub, GitLab, Halloween, Winter, and more
+- **3-way theme toggle**: Light / Dark / System (follows OS preference)
+- **GitHub Primer design**: Uses GitHub's official color system
 - **Interactive tooltips**: Hover for detailed daily breakdowns
 - **Day breakdown panel**: Click to see per-source and per-model details
 - **Year filtering**: Navigate between years
 - **Source filtering**: Filter by platform (OpenCode, Claude, Codex, Gemini)
 - **Stats panel**: Total cost, tokens, active days, streaks
+- **FOUC prevention**: Theme applied before React hydrates (no flash)
 
 ### Running the Frontend
 
@@ -409,6 +420,8 @@ Session files containing message arrays:
 ## Pricing
 
 Token Tracker fetches real-time pricing from [LiteLLM's pricing database](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json).
+
+**Caching**: Pricing data is cached to disk at `~/.cache/token-tracker/pricing.json` with a 1-hour TTL. This ensures fast startup while keeping pricing data fresh.
 
 Pricing includes:
 - Input tokens

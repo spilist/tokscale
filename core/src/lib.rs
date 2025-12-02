@@ -394,8 +394,14 @@ fn build_pricing_data(entries: &[PricingEntry]) -> PricingData {
             pricing::ModelPricing {
                 input_cost_per_token: entry.pricing.input_cost_per_token,
                 output_cost_per_token: entry.pricing.output_cost_per_token,
-                cache_read_input_token_cost: entry.pricing.cache_read_input_token_cost.unwrap_or(0.0),
-                cache_creation_input_token_cost: entry.pricing.cache_creation_input_token_cost.unwrap_or(0.0),
+                cache_read_input_token_cost: entry
+                    .pricing
+                    .cache_read_input_token_cost
+                    .unwrap_or(0.0),
+                cache_creation_input_token_cost: entry
+                    .pricing
+                    .cache_creation_input_token_cost
+                    .unwrap_or(0.0),
             },
         );
     }
@@ -560,7 +566,11 @@ pub fn get_model_report(options: ReportOptions) -> napi::Result<ModelReport> {
 
     let mut entries: Vec<ModelUsage> = model_map.into_values().collect();
     // Sort by cost descending
-    entries.sort_by(|a, b| b.cost.partial_cmp(&a.cost).unwrap_or(std::cmp::Ordering::Equal));
+    entries.sort_by(|a, b| {
+        b.cost
+            .partial_cmp(&a.cost)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let total_input: i64 = entries.iter().map(|e| e.input).sum();
     let total_output: i64 = entries.iter().map(|e| e.output).sum();
@@ -579,6 +589,18 @@ pub fn get_model_report(options: ReportOptions) -> napi::Result<ModelReport> {
         total_cost,
         processing_time_ms: start.elapsed().as_millis() as u32,
     })
+}
+
+/// Helper struct for aggregating monthly data (avoids clippy::type_complexity)
+#[derive(Default)]
+struct MonthAggregator {
+    models: std::collections::HashSet<String>,
+    input: i64,
+    output: i64,
+    cache_read: i64,
+    cache_write: i64,
+    message_count: i32,
+    cost: f64,
 }
 
 /// Get monthly usage report with pricing calculation
@@ -608,10 +630,8 @@ pub fn get_monthly_report(options: ReportOptions) -> napi::Result<MonthlyReport>
     let filtered = filter_messages_for_report(all_messages, &options);
 
     // Aggregate by month
-    let mut month_map: std::collections::HashMap<
-        String,
-        (std::collections::HashSet<String>, i64, i64, i64, i64, i32, f64),
-    > = std::collections::HashMap::new();
+    let mut month_map: std::collections::HashMap<String, MonthAggregator> =
+        std::collections::HashMap::new();
 
     for msg in filtered {
         // Extract month from date (YYYY-MM-DD -> YYYY-MM)
@@ -621,32 +641,28 @@ pub fn get_monthly_report(options: ReportOptions) -> napi::Result<MonthlyReport>
             continue;
         };
 
-        let entry = month_map.entry(month).or_insert_with(|| {
-            (std::collections::HashSet::new(), 0, 0, 0, 0, 0, 0.0)
-        });
+        let entry = month_map.entry(month).or_default();
 
-        entry.0.insert(msg.model_id.clone());
-        entry.1 += msg.tokens.input;
-        entry.2 += msg.tokens.output;
-        entry.3 += msg.tokens.cache_read;
-        entry.4 += msg.tokens.cache_write;
-        entry.5 += 1;
-        entry.6 += msg.cost;
+        entry.models.insert(msg.model_id.clone());
+        entry.input += msg.tokens.input;
+        entry.output += msg.tokens.output;
+        entry.cache_read += msg.tokens.cache_read;
+        entry.cache_write += msg.tokens.cache_write;
+        entry.message_count += 1;
+        entry.cost += msg.cost;
     }
 
     let mut entries: Vec<MonthlyUsage> = month_map
         .into_iter()
-        .map(|(month, (models, input, output, cache_read, cache_write, msg_count, cost))| {
-            MonthlyUsage {
-                month,
-                models: models.into_iter().collect(),
-                input,
-                output,
-                cache_read,
-                cache_write,
-                message_count: msg_count,
-                cost,
-            }
+        .map(|(month, agg)| MonthlyUsage {
+            month,
+            models: agg.models.into_iter().collect(),
+            input: agg.input,
+            output: agg.output,
+            cache_read: agg.cache_read,
+            cache_write: agg.cache_write,
+            message_count: agg.message_count,
+            cost: agg.cost,
         })
         .collect();
 

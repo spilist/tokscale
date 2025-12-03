@@ -58,8 +58,6 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsLoading(true);
-    setError(null);
     fetch(`/api/users/${username}`)
       .then((res) => {
         if (!res.ok) throw new Error("User not found");
@@ -159,7 +157,7 @@ export default function ProfilePage() {
               User Not Found
             </h1>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
-              The user @{username} doesn't exist or hasn't submitted any data yet.
+              The user @{username} doesn&apos;t exist or hasn&apos;t submitted any data yet.
             </p>
             <Button as={Link} href="/" variant="primary">
               Back to Leaderboard

@@ -14,7 +14,9 @@ export interface Credentials {
   createdAt: string;
 }
 
-const CONFIG_DIR = path.join(os.homedir(), ".token-tracker");
+const OLD_CONFIG_DIR = path.join(os.homedir(), ".token-tracker");
+const CONFIG_DIR = path.join(os.homedir(), ".config", "token-tracker");
+const OLD_CREDENTIALS_FILE = path.join(OLD_CONFIG_DIR, "credentials.json");
 const CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
 
 /**
@@ -23,6 +25,29 @@ const CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
 function ensureConfigDir(): void {
   if (!fs.existsSync(CONFIG_DIR)) {
     fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  }
+}
+
+/**
+ * Migrate credentials from old path (~/.token-tracker) to new XDG path (~/.config/token-tracker)
+ */
+function migrateFromOldPath(): void {
+  try {
+    if (!fs.existsSync(CREDENTIALS_FILE) && fs.existsSync(OLD_CREDENTIALS_FILE)) {
+      ensureConfigDir();
+      fs.copyFileSync(OLD_CREDENTIALS_FILE, CREDENTIALS_FILE);
+      fs.chmodSync(CREDENTIALS_FILE, 0o600);
+      // Delete old file after successful migration
+      fs.unlinkSync(OLD_CREDENTIALS_FILE);
+      // Try to remove old directory if empty
+      try {
+        fs.rmdirSync(OLD_CONFIG_DIR);
+      } catch {
+        // Directory not empty (cursor files may exist) - ignore
+      }
+    }
+  } catch {
+    // Migration failed - continue with normal operation (old path may still work)
   }
 }
 
@@ -42,6 +67,7 @@ export function saveCredentials(credentials: Credentials): void {
  * Returns null if no credentials are stored or file is invalid
  */
 export function loadCredentials(): Credentials | null {
+  migrateFromOldPath();
   try {
     if (!fs.existsSync(CREDENTIALS_FILE)) {
       return null;

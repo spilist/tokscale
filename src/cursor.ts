@@ -68,12 +68,41 @@ export interface CursorMessageWithTimestamp {
 // Credential Management
 // ============================================================================
 
-const CONFIG_DIR = path.join(os.homedir(), ".token-tracker");
+const OLD_CONFIG_DIR = path.join(os.homedir(), ".token-tracker");
+const CONFIG_DIR = path.join(os.homedir(), ".config", "token-tracker");
+const OLD_CURSOR_CREDENTIALS_FILE = path.join(OLD_CONFIG_DIR, "cursor-credentials.json");
 const CURSOR_CREDENTIALS_FILE = path.join(CONFIG_DIR, "cursor-credentials.json");
 
 function ensureConfigDir(): void {
   if (!fs.existsSync(CONFIG_DIR)) {
     fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  }
+}
+
+/**
+ * Migrate Cursor credentials and cache from old path to new XDG path
+ */
+function migrateCursorFromOldPath(): void {
+  try {
+    // Migrate cursor credentials
+    if (!fs.existsSync(CURSOR_CREDENTIALS_FILE) && fs.existsSync(OLD_CURSOR_CREDENTIALS_FILE)) {
+      ensureConfigDir();
+      fs.copyFileSync(OLD_CURSOR_CREDENTIALS_FILE, CURSOR_CREDENTIALS_FILE);
+      fs.chmodSync(CURSOR_CREDENTIALS_FILE, 0o600);
+      fs.unlinkSync(OLD_CURSOR_CREDENTIALS_FILE);
+    }
+
+    // Migrate cache directory (handled after CURSOR_CACHE_DIR is defined)
+    // Cache migration happens in migrateCursorCacheFromOldPath()
+
+    // Try to remove old config directory if empty
+    try {
+      fs.rmdirSync(OLD_CONFIG_DIR);
+    } catch {
+      // Directory not empty - ignore
+    }
+  } catch {
+    // Migration failed - continue with normal operation
   }
 }
 
@@ -86,6 +115,7 @@ export function saveCursorCredentials(credentials: CursorCredentials): void {
 }
 
 export function loadCursorCredentials(): CursorCredentials | null {
+  migrateCursorFromOldPath();
   try {
     if (!fs.existsSync(CURSOR_CREDENTIALS_FILE)) {
       return null;
@@ -390,7 +420,8 @@ export function getCursorCredentialsPath(): string {
 // Cache Management (for Rust integration)
 // ============================================================================
 
-const CURSOR_CACHE_DIR = path.join(os.homedir(), ".token-tracker", "cursor-cache");
+const OLD_CURSOR_CACHE_DIR = path.join(os.homedir(), ".token-tracker", "cursor-cache");
+const CURSOR_CACHE_DIR = path.join(CONFIG_DIR, "cursor-cache");
 const CURSOR_CACHE_FILE = path.join(CURSOR_CACHE_DIR, "usage.csv");
 
 function ensureCacheDir(): void {
@@ -400,10 +431,33 @@ function ensureCacheDir(): void {
 }
 
 /**
+ * Migrate cursor cache from old path to new XDG path
+ */
+function migrateCursorCacheFromOldPath(): void {
+  try {
+    if (!fs.existsSync(CURSOR_CACHE_DIR) && fs.existsSync(OLD_CURSOR_CACHE_DIR)) {
+      ensureCacheDir();
+      fs.cpSync(OLD_CURSOR_CACHE_DIR, CURSOR_CACHE_DIR, { recursive: true });
+      fs.rmSync(OLD_CURSOR_CACHE_DIR, { recursive: true });
+    }
+
+    // Try to remove old config directory if empty
+    try {
+      fs.rmdirSync(OLD_CONFIG_DIR);
+    } catch {
+      // Directory not empty - ignore
+    }
+  } catch {
+    // Migration failed - continue with normal operation
+  }
+}
+
+/**
  * Sync Cursor usage data from API to local cache
  * This downloads the CSV and saves it for the Rust module to parse
  */
 export async function syncCursorCache(): Promise<{ synced: boolean; rows: number; error?: string }> {
+  migrateCursorCacheFromOldPath();
   const credentials = loadCursorCredentials();
   if (!credentials) {
     return { synced: false, rows: 0, error: "Not authenticated" };

@@ -40,6 +40,70 @@ interface FilterOptions {
   gemini?: boolean;
 }
 
+interface DateFilterOptions {
+  since?: string;
+  until?: string;
+  year?: string;
+  today?: boolean;
+  week?: boolean;
+  month?: boolean;
+}
+
+// =============================================================================
+// Date Helpers
+// =============================================================================
+
+function formatDate(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
+function getDateFilters(options: DateFilterOptions): { since?: string; until?: string; year?: string } {
+  const today = new Date();
+  
+  // --today: just today
+  if (options.today) {
+    const todayStr = formatDate(today);
+    return { since: todayStr, until: todayStr };
+  }
+  
+  // --week: last 7 days
+  if (options.week) {
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 6); // Include today = 7 days
+    return { since: formatDate(weekAgo), until: formatDate(today) };
+  }
+  
+  // --month: current calendar month
+  if (options.month) {
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { since: formatDate(startOfMonth), until: formatDate(today) };
+  }
+  
+  // Explicit filters
+  return {
+    since: options.since,
+    until: options.until,
+    year: options.year,
+  };
+}
+
+function getDateRangeLabel(options: DateFilterOptions): string | null {
+  if (options.today) return "Today";
+  if (options.week) return "Last 7 days";
+  if (options.month) {
+    const today = new Date();
+    return today.toLocaleString("en-US", { month: "long", year: "numeric" } as Intl.DateTimeFormatOptions);
+  }
+  if (options.year) return options.year;
+  if (options.since || options.until) {
+    const parts: string[] = [];
+    if (options.since) parts.push(`from ${options.since}`);
+    if (options.until) parts.push(`to ${options.until}`);
+    return parts.join(" ");
+  }
+  return null;
+}
+
 async function main() {
   const program = new Command();
 
@@ -55,6 +119,12 @@ async function main() {
     .option("--claude", "Show only Claude Code usage")
     .option("--codex", "Show only Codex CLI usage")
     .option("--gemini", "Show only Gemini CLI usage")
+    .option("--today", "Show only today's usage")
+    .option("--week", "Show last 7 days")
+    .option("--month", "Show current month")
+    .option("--since <date>", "Start date (YYYY-MM-DD)")
+    .option("--until <date>", "End date (YYYY-MM-DD)")
+    .option("--year <year>", "Filter to specific year")
     .option("--benchmark", "Show processing time")
     .action(async (options) => {
       await showMonthlyReport(options);
@@ -67,6 +137,12 @@ async function main() {
     .option("--claude", "Show only Claude Code usage")
     .option("--codex", "Show only Codex CLI usage")
     .option("--gemini", "Show only Gemini CLI usage")
+    .option("--today", "Show only today's usage")
+    .option("--week", "Show last 7 days")
+    .option("--month", "Show current month")
+    .option("--since <date>", "Start date (YYYY-MM-DD)")
+    .option("--until <date>", "End date (YYYY-MM-DD)")
+    .option("--year <year>", "Filter to specific year")
     .option("--benchmark", "Show processing time")
     .action(async (options) => {
       await showModelReport(options);
@@ -80,6 +156,9 @@ async function main() {
     .option("--claude", "Include only Claude Code data")
     .option("--codex", "Include only Codex CLI data")
     .option("--gemini", "Include only Gemini CLI data")
+    .option("--today", "Show only today's usage")
+    .option("--week", "Show last 7 days")
+    .option("--month", "Show current month")
     .option("--since <date>", "Start date (YYYY-MM-DD)")
     .option("--until <date>", "End date (YYYY-MM-DD)")
     .option("--year <year>", "Filter to specific year")
@@ -147,6 +226,12 @@ async function main() {
     .option("--claude", "Show only Claude Code usage")
     .option("--codex", "Show only Codex CLI usage")
     .option("--gemini", "Show only Gemini CLI usage")
+    .option("--today", "Show only today's usage")
+    .option("--week", "Show last 7 days")
+    .option("--month", "Show current month")
+    .option("--since <date>", "Start date (YYYY-MM-DD)")
+    .option("--until <date>", "End date (YYYY-MM-DD)")
+    .option("--year <year>", "Filter to specific year")
     .option("--benchmark", "Show processing time")
     .action(async (options) => {
       await showModelReport(options);
@@ -184,10 +269,15 @@ async function fetchPricingWithCache(spinner?: ReturnType<typeof createSpinner>)
   return fetcher;
 }
 
-async function showModelReport(options: FilterOptions & { benchmark?: boolean }) {
+async function showModelReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }) {
   await ensureNativeModule();
 
-  console.log(pc.cyan("\n  Token Usage Report by Model"));
+  const dateRange = getDateRangeLabel(options);
+  const title = dateRange 
+    ? `Token Usage Report by Model (${dateRange})`
+    : "Token Usage Report by Model";
+  
+  console.log(pc.cyan(`\n  ${title}`));
   if (options.benchmark) {
     console.log(pc.gray(`  Using: Rust native module v${getNativeVersion()}`));
   }
@@ -203,11 +293,16 @@ async function showModelReport(options: FilterOptions & { benchmark?: boolean })
   spinner.update(pc.gray("Processing session data..."));
   const startTime = performance.now();
 
+  const dateFilters = getDateFilters(options);
+  
   let report: ModelReport;
   try {
     report = getModelReportNative({
       sources: getEnabledSources(options),
       pricing: pricingEntries,
+      since: dateFilters.since,
+      until: dateFilters.until,
+      year: dateFilters.year,
     });
   } catch (e) {
     spinner.error(`Error: ${(e as Error).message}`);
@@ -270,10 +365,15 @@ async function showModelReport(options: FilterOptions & { benchmark?: boolean })
   console.log();
 }
 
-async function showMonthlyReport(options: FilterOptions & { benchmark?: boolean }) {
+async function showMonthlyReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }) {
   await ensureNativeModule();
 
-  console.log(pc.cyan("\n  Monthly Token Usage Report"));
+  const dateRange = getDateRangeLabel(options);
+  const title = dateRange 
+    ? `Monthly Token Usage Report (${dateRange})`
+    : "Monthly Token Usage Report";
+
+  console.log(pc.cyan(`\n  ${title}`));
   if (options.benchmark) {
     console.log(pc.gray(`  Using: Rust native module v${getNativeVersion()}`));
   }
@@ -289,11 +389,16 @@ async function showMonthlyReport(options: FilterOptions & { benchmark?: boolean 
   spinner.update(pc.gray("Processing session data..."));
   const startTime = performance.now();
 
+  const dateFilters = getDateFilters(options);
+
   let report: MonthlyReport;
   try {
     report = getMonthlyReportNative({
       sources: getEnabledSources(options),
       pricing: pricingEntries,
+      since: dateFilters.since,
+      until: dateFilters.until,
+      year: dateFilters.year,
     });
   } catch (e) {
     spinner.error(`Error: ${(e as Error).message}`);
@@ -345,15 +450,8 @@ async function showMonthlyReport(options: FilterOptions & { benchmark?: boolean 
   console.log();
 }
 
-interface GraphCommandOptions {
+interface GraphCommandOptions extends FilterOptions, DateFilterOptions {
   output?: string;
-  opencode?: boolean;
-  claude?: boolean;
-  codex?: boolean;
-  gemini?: boolean;
-  since?: string;
-  until?: string;
-  year?: string;
   benchmark?: boolean;
 }
 
@@ -372,14 +470,15 @@ async function handleGraphCommand(options: GraphCommandOptions) {
 
   // Determine which sources to include
   const sources = getEnabledSources(options);
+  const dateFilters = getDateFilters(options);
 
   // Generate graph data using native module
   const data = generateGraphWithPricing({
     sources,
     pricing: pricingEntries,
-    since: options.since,
-    until: options.until,
-    year: options.year,
+    since: dateFilters.since,
+    until: dateFilters.until,
+    year: dateFilters.year,
   });
 
   const processingTime = performance.now() - startTime;

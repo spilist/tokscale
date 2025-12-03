@@ -4,6 +4,7 @@ import type { DailyContribution, GraphColorPalette, SourceType } from "@/lib/typ
 import { formatDateFull, formatCurrency, formatTokenCount, groupSourcesByType, sortSourcesByCost } from "@/lib/utils";
 import { SOURCE_DISPLAY_NAMES, SOURCE_COLORS } from "@/lib/constants";
 import { ProviderLogo } from "./ProviderLogo";
+import { SourceLogo } from "./SourceLogo";
 
 interface BreakdownPanelProps {
   day: DailyContribution | null;
@@ -92,7 +93,7 @@ function SourceSection({ sourceType, sources, totalCost, palette }: SourceSectio
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-transform hover:scale-105"
           style={{ backgroundColor: `${sourceColor}20`, color: sourceColor }}
         >
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sourceColor }} />
+          <SourceLogo sourceId={sourceType} height={14} />
           {SOURCE_DISPLAY_NAMES[sourceType] || sourceType}
         </span>
         <span className="text-sm font-bold" style={{ color: "var(--color-fg-default)" }}>{formatCurrency(totalCost)}</span>

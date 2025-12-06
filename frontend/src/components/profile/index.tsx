@@ -100,7 +100,7 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
           </div>
         </div>
 
-        <div className="flex flex-row gap-7 h-[124px] flex-1">
+        <div className="flex flex-row items-center gap-7 h-[124px] flex-1">
           <div className="flex flex-col gap-[15px] flex-1 min-w-[120px]">
             <span
               className="text-base font-semibold leading-none"

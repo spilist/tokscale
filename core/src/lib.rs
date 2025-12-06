@@ -675,7 +675,10 @@ pub fn get_model_report(options: ReportOptions) -> napi::Result<ModelReport> {
             (true, true) => std::cmp::Ordering::Equal,
             (true, false) => std::cmp::Ordering::Greater, // NaN sorts after valid values
             (false, true) => std::cmp::Ordering::Less,
-            (false, false) => b.cost.partial_cmp(&a.cost).unwrap_or(std::cmp::Ordering::Equal),
+            (false, false) => b
+                .cost
+                .partial_cmp(&a.cost)
+                .unwrap_or(std::cmp::Ordering::Equal),
         }
     });
 
@@ -876,10 +879,7 @@ pub fn parse_local_sources(options: LocalParseOptions) -> napi::Result<ParsedMes
     });
 
     // Filter out cursor if somehow included
-    let local_sources: Vec<String> = sources
-        .into_iter()
-        .filter(|s| s != "cursor")
-        .collect();
+    let local_sources: Vec<String> = sources.into_iter().filter(|s| s != "cursor").collect();
 
     let scan_result = scanner::scan_all_sources(&home_dir, &local_sources);
 
@@ -1045,7 +1045,7 @@ pub fn finalize_report(options: FinalizeReportOptions) -> napi::Result<ModelRepo
     if options.include_cursor {
         let cursor_cache_dir = format!("{}/.token-tracker/cursor-cache", home_dir);
         let cursor_files = scanner::scan_directory(&cursor_cache_dir, "*.csv");
-        
+
         let cursor_messages: Vec<UnifiedMessage> = cursor_files
             .par_iter()
             .flat_map(|path| {
@@ -1061,13 +1061,17 @@ pub fn finalize_report(options: FinalizeReportOptions) -> napi::Result<ModelRepo
                             msg.tokens.cache_write,
                             msg.tokens.reasoning,
                         );
-                        msg.cost = if calculated_cost > 0.0 { calculated_cost } else { csv_cost };
+                        msg.cost = if calculated_cost > 0.0 {
+                            calculated_cost
+                        } else {
+                            csv_cost
+                        };
                         msg
                     })
                     .collect::<Vec<_>>()
             })
             .collect();
-        
+
         all_messages.extend(cursor_messages);
     }
 
@@ -1114,13 +1118,14 @@ pub fn finalize_report(options: FinalizeReportOptions) -> napi::Result<ModelRepo
     }
 
     let mut entries: Vec<ModelUsage> = model_map.into_values().collect();
-    entries.sort_by(|a, b| {
-        match (a.cost.is_nan(), b.cost.is_nan()) {
-            (true, true) => std::cmp::Ordering::Equal,
-            (true, false) => std::cmp::Ordering::Greater,
-            (false, true) => std::cmp::Ordering::Less,
-            (false, false) => b.cost.partial_cmp(&a.cost).unwrap_or(std::cmp::Ordering::Equal),
-        }
+    entries.sort_by(|a, b| match (a.cost.is_nan(), b.cost.is_nan()) {
+        (true, true) => std::cmp::Ordering::Equal,
+        (true, false) => std::cmp::Ordering::Greater,
+        (false, true) => std::cmp::Ordering::Less,
+        (false, false) => b
+            .cost
+            .partial_cmp(&a.cost)
+            .unwrap_or(std::cmp::Ordering::Equal),
     });
 
     let total_input: i64 = entries.iter().map(|e| e.input).sum();
@@ -1190,7 +1195,7 @@ pub fn finalize_monthly_report(options: FinalizeMonthlyOptions) -> napi::Result<
     if options.include_cursor {
         let cursor_cache_dir = format!("{}/.token-tracker/cursor-cache", home_dir);
         let cursor_files = scanner::scan_directory(&cursor_cache_dir, "*.csv");
-        
+
         let cursor_messages: Vec<UnifiedMessage> = cursor_files
             .par_iter()
             .flat_map(|path| {
@@ -1206,13 +1211,17 @@ pub fn finalize_monthly_report(options: FinalizeMonthlyOptions) -> napi::Result<
                             msg.tokens.cache_write,
                             msg.tokens.reasoning,
                         );
-                        msg.cost = if calculated_cost > 0.0 { calculated_cost } else { csv_cost };
+                        msg.cost = if calculated_cost > 0.0 {
+                            calculated_cost
+                        } else {
+                            csv_cost
+                        };
                         msg
                     })
                     .collect::<Vec<_>>()
             })
             .collect();
-        
+
         all_messages.extend(cursor_messages);
     }
 
@@ -1321,7 +1330,7 @@ pub fn finalize_graph(options: FinalizeGraphOptions) -> napi::Result<GraphResult
     if options.include_cursor {
         let cursor_cache_dir = format!("{}/.token-tracker/cursor-cache", home_dir);
         let cursor_files = scanner::scan_directory(&cursor_cache_dir, "*.csv");
-        
+
         let cursor_messages: Vec<UnifiedMessage> = cursor_files
             .par_iter()
             .flat_map(|path| {
@@ -1337,13 +1346,17 @@ pub fn finalize_graph(options: FinalizeGraphOptions) -> napi::Result<GraphResult
                             msg.tokens.cache_write,
                             msg.tokens.reasoning,
                         );
-                        msg.cost = if calculated_cost > 0.0 { calculated_cost } else { csv_cost };
+                        msg.cost = if calculated_cost > 0.0 {
+                            calculated_cost
+                        } else {
+                            csv_cost
+                        };
                         msg
                     })
                     .collect::<Vec<_>>()
             })
             .collect();
-        
+
         all_messages.extend(cursor_messages);
     }
 

@@ -137,10 +137,11 @@ impl PricingData {
 
         // Resolve the key
         let resolved_key = self.resolve_model_key(model_id);
-        
+
         // Cache the result
-        self.resolution_cache.insert(model_id.to_string(), resolved_key.clone());
-        
+        self.resolution_cache
+            .insert(model_id.to_string(), resolved_key.clone());
+
         resolved_key.and_then(|k| self.models.get(&k))
     }
 
@@ -298,14 +299,7 @@ mod tests {
         );
         pricing.finalize();
 
-        let cost = pricing.calculate_cost(
-            "claude-3-5-sonnet-20241022",
-            1000,
-            500,
-            2000,
-            100,
-            0,
-        );
+        let cost = pricing.calculate_cost("claude-3-5-sonnet-20241022", 1000, 500, 2000, 100, 0);
 
         assert!((cost - 0.011475).abs() < 0.0001);
     }
@@ -342,9 +336,13 @@ mod tests {
         pricing.finalize();
 
         // First lookup resolves and caches
-        assert!(pricing.get_pricing_cached("claude-3-5-sonnet-20241022").is_some());
-        
+        assert!(pricing
+            .get_pricing_cached("claude-3-5-sonnet-20241022")
+            .is_some());
+
         // Second lookup uses cache
-        assert!(pricing.get_pricing_cached("claude-3-5-sonnet-20241022").is_some());
+        assert!(pricing
+            .get_pricing_cached("claude-3-5-sonnet-20241022")
+            .is_some());
     }
 }

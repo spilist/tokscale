@@ -13,8 +13,12 @@ use std::path::Path;
 /// Provider inference from model name
 fn infer_provider(model: &str) -> &'static str {
     let lower = model.to_lowercase();
-    
-    if lower.contains("claude") || lower.contains("sonnet") || lower.contains("opus") || lower.contains("haiku") {
+
+    if lower.contains("claude")
+        || lower.contains("sonnet")
+        || lower.contains("opus")
+        || lower.contains("haiku")
+    {
         "anthropic"
     } else if lower.contains("gpt") || lower.contains("o1") || lower.contains("o3") {
         "openai"
@@ -34,17 +38,17 @@ fn infer_provider(model: &str) -> &'static str {
 fn parse_cost(cost_str: &str) -> f64 {
     let cleaned = cost_str.replace(['$', ','], "");
     let trimmed = cleaned.trim();
-    
+
     // Handle empty or NaN values
     if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("nan") {
         return 0.0;
     }
-    
+
     trimmed.parse().unwrap_or(0.0)
 }
 
 /// Parse a Cursor usage CSV file
-/// 
+///
 /// Handles both formats:
 /// - New: Date,Kind,Model,Max Mode,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens,Total Tokens,Cost
 /// - Old: Date,Model,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens,Total Tokens,Cost,Cost to you
@@ -56,7 +60,7 @@ pub fn parse_cursor_file(path: &Path) -> Vec<UnifiedMessage> {
 
     let mut messages = Vec::new();
     let mut lines = content.lines();
-    
+
     // Parse header line to determine column indices
     let header = match lines.next() {
         Some(h) => h,
@@ -71,16 +75,22 @@ pub fn parse_cursor_file(path: &Path) -> Vec<UnifiedMessage> {
     // Detect format by checking for "Kind" column
     let header_fields: Vec<&str> = parse_csv_line(header);
     let has_kind_column = header_fields.iter().any(|f| f.trim() == "Kind");
-    
+
     // Column indices based on format
-    let (model_idx, input_cache_write_idx, input_no_cache_idx, cache_read_idx, output_idx, cost_idx) = 
-        if has_kind_column {
-            // New format: Date,Kind,Model,Max Mode,Input (w/ Cache Write),...
-            (2, 4, 5, 6, 7, 9)
-        } else {
-            // Old format: Date,Model,Input (w/ Cache Write),...
-            (1, 2, 3, 4, 5, 7)
-        };
+    let (
+        model_idx,
+        input_cache_write_idx,
+        input_no_cache_idx,
+        cache_read_idx,
+        output_idx,
+        cost_idx,
+    ) = if has_kind_column {
+        // New format: Date,Kind,Model,Max Mode,Input (w/ Cache Write),...
+        (2, 4, 5, 6, 7, 9)
+    } else {
+        // Old format: Date,Model,Input (w/ Cache Write),...
+        (1, 2, 3, 4, 5, 7)
+    };
 
     for line in lines {
         if line.trim().is_empty() {
@@ -89,7 +99,7 @@ pub fn parse_cursor_file(path: &Path) -> Vec<UnifiedMessage> {
 
         // Parse CSV line (simple parsing, handles quoted fields)
         let fields: Vec<&str> = parse_csv_line(line);
-        
+
         // Need at least enough columns for the format
         let min_fields = cost_idx + 1;
         if fields.len() < min_fields {
@@ -98,10 +108,26 @@ pub fn parse_cursor_file(path: &Path) -> Vec<UnifiedMessage> {
 
         let date_str = fields[0].trim().trim_matches('"');
         let model = fields[model_idx].trim().trim_matches('"');
-        let input_with_cache_write: i64 = fields[input_cache_write_idx].trim().trim_matches('"').parse().unwrap_or(0);
-        let input_without_cache_write: i64 = fields[input_no_cache_idx].trim().trim_matches('"').parse().unwrap_or(0);
-        let cache_read: i64 = fields[cache_read_idx].trim().trim_matches('"').parse().unwrap_or(0);
-        let output_tokens: i64 = fields[output_idx].trim().trim_matches('"').parse().unwrap_or(0);
+        let input_with_cache_write: i64 = fields[input_cache_write_idx]
+            .trim()
+            .trim_matches('"')
+            .parse()
+            .unwrap_or(0);
+        let input_without_cache_write: i64 = fields[input_no_cache_idx]
+            .trim()
+            .trim_matches('"')
+            .parse()
+            .unwrap_or(0);
+        let cache_read: i64 = fields[cache_read_idx]
+            .trim()
+            .trim_matches('"')
+            .parse()
+            .unwrap_or(0);
+        let output_tokens: i64 = fields[output_idx]
+            .trim()
+            .trim_matches('"')
+            .parse()
+            .unwrap_or(0);
         let cost_str = fields[cost_idx].trim().trim_matches('"');
         let cost = parse_cost(cost_str);
 
@@ -146,7 +172,7 @@ fn parse_csv_line(line: &str) -> Vec<&str> {
     let mut start = 0;
     let mut in_quotes = false;
     let bytes = line.as_bytes();
-    
+
     for (i, &byte) in bytes.iter().enumerate() {
         match byte {
             b'"' => in_quotes = !in_quotes,
@@ -157,45 +183,45 @@ fn parse_csv_line(line: &str) -> Vec<&str> {
             _ => {}
         }
     }
-    
+
     // Add the last field
     if start <= line.len() {
         fields.push(&line[start..]);
     }
-    
+
     fields
 }
 
 /// Parse a date string to Unix milliseconds timestamp
 fn parse_date_to_timestamp(date_str: &str) -> i64 {
-    use chrono::{NaiveDateTime, NaiveDate, TimeZone, Utc};
-    
+    use chrono::{NaiveDate, NaiveDateTime, TimeZone, Utc};
+
     // Try ISO 8601 format with milliseconds: "2025-02-05T12:00:00.123Z"
     if let Ok(dt) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.3fZ") {
         return Utc.from_utc_datetime(&dt).timestamp_millis();
     }
-    
+
     // Try ISO 8601 format with time: "2025-02-05T12:00:00Z"
     if let Ok(dt) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%SZ") {
         return Utc.from_utc_datetime(&dt).timestamp_millis();
     }
-    
+
     // Try ISO 8601 format with milliseconds without Z: "2025-02-05T12:00:00.123"
     if let Ok(dt) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.3f") {
         return Utc.from_utc_datetime(&dt).timestamp_millis();
     }
-    
+
     // Try ISO 8601 format with time without Z: "2025-02-05T12:00:00"
     if let Ok(dt) = NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S") {
         return Utc.from_utc_datetime(&dt).timestamp_millis();
     }
-    
+
     // Try date only format: "2025-02-05"
     if let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
         let dt = date.and_hms_opt(12, 0, 0).unwrap(); // Noon UTC
         return Utc.from_utc_datetime(&dt).timestamp_millis();
     }
-    
+
     0
 }
 
@@ -239,15 +265,15 @@ mod tests {
         // ISO with milliseconds and Z (new Cursor format)
         let ts = parse_date_to_timestamp("2025-11-13T18:36:05.846Z");
         assert!(ts > 0);
-        
+
         // ISO with Z
         let ts = parse_date_to_timestamp("2025-02-05T12:00:00Z");
         assert!(ts > 0);
-        
+
         // Date only
         let ts = parse_date_to_timestamp("2025-02-05");
         assert!(ts > 0);
-        
+
         // Invalid
         let ts = parse_date_to_timestamp("invalid");
         assert_eq!(ts, 0);
@@ -265,7 +291,7 @@ mod tests {
 
         let messages = parse_cursor_file(&file_path);
         assert_eq!(messages.len(), 2);
-        
+
         assert_eq!(messages[0].source, "cursor");
         assert_eq!(messages[0].model_id, "gpt-4o");
         assert_eq!(messages[0].provider_id, "openai");
@@ -290,7 +316,7 @@ mod tests {
 
         let messages = parse_cursor_file(&file_path);
         assert_eq!(messages.len(), 2);
-        
+
         // First message: auto model
         assert_eq!(messages[0].source, "cursor");
         assert_eq!(messages[0].model_id, "auto");

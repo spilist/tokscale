@@ -132,10 +132,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
         existing.cost += Number(day.cost);
         existing.inputTokens += Number(day.inputTokens);
         existing.outputTokens += Number(day.outputTokens);
-        // Merge source breakdowns
         if (day.sourceBreakdown) {
           for (const [source, data] of Object.entries(day.sourceBreakdown)) {
-            const breakdown = data as SourceBreakdown;
+            const breakdown = typeof data === "number"
+              ? { tokens: data, cost: 0, modelId: "", input: Math.floor(data / 2), output: Math.floor(data / 2), cacheRead: 0, cacheWrite: 0, messages: 0 }
+              : data as SourceBreakdown;
             if (existing.sources[source]) {
               existing.sources[source].tokens += breakdown.tokens;
               existing.sources[source].cost += breakdown.cost;
@@ -155,13 +156,21 @@ export async function GET(_request: Request, { params }: RouteParams) {
           }
         }
       } else {
+        const sources: Record<string, SourceBreakdown> = {};
+        if (day.sourceBreakdown) {
+          for (const [source, data] of Object.entries(day.sourceBreakdown)) {
+            sources[source] = typeof data === "number"
+              ? { tokens: data, cost: 0, modelId: "", input: Math.floor(data / 2), output: Math.floor(data / 2), cacheRead: 0, cacheWrite: 0, messages: 0 }
+              : data as SourceBreakdown;
+          }
+        }
         aggregatedDaily.set(day.date, {
           date: day.date,
           tokens: Number(day.tokens),
           cost: Number(day.cost),
           inputTokens: Number(day.inputTokens),
           outputTokens: Number(day.outputTokens),
-          sources: day.sourceBreakdown ? { ...(day.sourceBreakdown as Record<string, SourceBreakdown>) } : {},
+          sources,
           models: day.modelBreakdown ? { ...(day.modelBreakdown as Record<string, number>) } : {},
         });
       }

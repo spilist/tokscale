@@ -1,6 +1,6 @@
 {
   "name": "@0xinevitable/token-tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Calculate token prices from OpenCode, Claude Code, Codex, Gemini, and Cursor sessions",
   "license": "MIT",
   "type": "module",
@@ -27,7 +27,7 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@0xinevitable/token-tracker-core": "^0.1.0",
+    "@0xinevitable/token-tracker-core": "^0.1.1",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.2",
     "csv-parse": "^5.6.0",

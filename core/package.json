@@ -1,6 +1,6 @@
 {
   "name": "@0xinevitable/token-tracker-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native Rust core for token-tracker CLI - high-performance session parsing",
   "main": "index.js",
   "types": "index.d.ts",

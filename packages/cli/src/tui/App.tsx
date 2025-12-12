@@ -5,9 +5,10 @@ import { Footer } from "./components/Footer.js";
 import { ModelView } from "./components/ModelView.js";
 import { DailyView } from "./components/DailyView.js";
 import { StatsView } from "./components/StatsView.js";
+import { OverviewView } from "./components/OverviewView.js";
 import { useData } from "./hooks/useData.js";
 
-export type TabType = "model" | "daily" | "stats";
+export type TabType = "overview" | "model" | "daily" | "stats";
 export type SortType = "cost" | "name" | "tokens";
 export type SourceType = "opencode" | "claude" | "codex" | "cursor" | "gemini";
 
@@ -17,6 +18,7 @@ export interface AppState {
   sortBy: SortType;
   sortDesc: boolean;
   selectedIndex: number;
+  scrollOffset: number;
 }
 
 function useStdoutDimensions(): [number, number] {
@@ -37,11 +39,12 @@ export function App() {
   const [columns, rows] = useStdoutDimensions();
   
   const [state, setState] = useState<AppState>({
-    activeTab: "model",
+    activeTab: "overview",
     enabledSources: new Set(["opencode", "claude", "codex", "cursor", "gemini"]),
     sortBy: "cost",
     sortDesc: true,
     selectedIndex: 0,
+    scrollOffset: 0,
   });
 
   const { data, loading, error, refresh } = useData(state.enabledSources);
@@ -57,20 +60,18 @@ export function App() {
       return;
     }
 
-    if (key.tab) {
-      setState((s) => ({
-        ...s,
-        activeTab: s.activeTab === "model" ? "daily" : s.activeTab === "daily" ? "stats" : "model",
-        selectedIndex: 0,
-      }));
-      return;
-    }
+    const cycleTab = (current: TabType): TabType => {
+      const tabs: TabType[] = ["overview", "model", "daily", "stats"];
+      const idx = tabs.indexOf(current);
+      return tabs[(idx + 1) % tabs.length];
+    };
 
-    if (input === "d") {
+    if (key.tab || input === "d") {
       setState((s) => ({
         ...s,
-        activeTab: s.activeTab === "model" ? "daily" : s.activeTab === "daily" ? "stats" : "model",
+        activeTab: cycleTab(s.activeTab),
         selectedIndex: 0,
+        scrollOffset: 0,
       }));
       return;
     }
@@ -135,11 +136,25 @@ export function App() {
     }
 
     if (key.upArrow) {
-      setState((s) => ({ ...s, selectedIndex: Math.max(0, s.selectedIndex - 1) }));
+      setState((s) => {
+        if (s.activeTab === "overview" && s.scrollOffset > 0) {
+          return { ...s, scrollOffset: s.scrollOffset - 1 };
+        }
+        return { ...s, selectedIndex: Math.max(0, s.selectedIndex - 1) };
+      });
       return;
     }
     if (key.downArrow) {
-      setState((s) => ({ ...s, selectedIndex: s.selectedIndex + 1 }));
+      setState((s) => {
+        if (s.activeTab === "overview") {
+          const chartH = Math.max(5, Math.floor(contentHeight * 0.35));
+          const listH = Math.max(4, contentHeight - chartH - 4);
+          const perPage = Math.max(1, Math.floor(listH / 2));
+          const maxOffset = Math.max(0, (data?.topModels.length ?? 0) - perPage);
+          return { ...s, scrollOffset: Math.min(maxOffset, s.scrollOffset + 1) };
+        }
+        return { ...s, selectedIndex: s.selectedIndex + 1 };
+      });
       return;
     }
 
@@ -160,7 +175,11 @@ export function App() {
     }
   });
 
-  const contentHeight = rows - 6;
+  const contentHeight = Math.max(rows - 6, 12);
+  
+  const overviewChartHeight = Math.max(5, Math.floor(contentHeight * 0.35));
+  const overviewListHeight = Math.max(4, contentHeight - overviewChartHeight - 4);
+  const overviewItemsPerPage = Math.max(1, Math.floor(overviewListHeight / 2));
 
   return (
     <Box flexDirection="column" width={columns} height={rows}>
@@ -177,6 +196,15 @@ export function App() {
           </Box>
         ) : (
           <>
+            {state.activeTab === "overview" && (
+              <OverviewView
+                data={data}
+                selectedIndex={state.selectedIndex}
+                scrollOffset={state.scrollOffset}
+                height={contentHeight}
+                width={columns}
+              />
+            )}
             {state.activeTab === "model" && (
               <ModelView 
                 data={data} 
@@ -207,6 +235,10 @@ export function App() {
         sortBy={state.sortBy}
         totalCost={data?.totalCost ?? 0}
         modelCount={data?.modelCount ?? 0}
+        activeTab={state.activeTab}
+        scrollStart={state.scrollOffset}
+        scrollEnd={Math.min(state.scrollOffset + overviewItemsPerPage, data?.topModels.length ?? 0)}
+        totalItems={data?.topModels.length}
       />
     </Box>
   );

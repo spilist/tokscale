@@ -9,6 +9,8 @@ import {
 } from "../../native.js";
 import { PricingFetcher } from "../../pricing.js";
 import { syncCursorCache, loadCursorCredentials } from "../../cursor.js";
+import { getModelColor } from "../utils/colors.js";
+import type { ChartDataPoint } from "../components/BarChart.js";
 
 export type { SortType } from "../App.js";
 
@@ -50,6 +52,15 @@ export interface Stats {
   peakHour: string;
 }
 
+export interface ModelWithPercentage {
+  modelId: string;
+  percentage: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cost: number;
+}
+
 export interface TUIData {
   modelEntries: ModelEntry[];
   dailyEntries: DailyEntry[];
@@ -57,6 +68,8 @@ export interface TUIData {
   stats: Stats;
   totalCost: number;
   modelCount: number;
+  chartData: ChartDataPoint[];
+  topModels: ModelWithPercentage[];
 }
 
 async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
@@ -161,9 +174,11 @@ async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
     if (i === 0) {
       streak = 1;
     } else {
-      const prev = new Date(sortedDates[i - 1]);
-      const curr = new Date(sortedDates[i]);
-      const diffDays = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
+      const prevParts = sortedDates[i - 1].split("-").map(Number);
+      const currParts = sortedDates[i].split("-").map(Number);
+      const prevDate = Date.UTC(prevParts[0], prevParts[1] - 1, prevParts[2]);
+      const currDate = Date.UTC(currParts[0], currParts[1] - 1, currParts[2]);
+      const diffDays = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
       if (diffDays === 1) {
         streak++;
       } else {
@@ -187,6 +202,60 @@ async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
     peakHour: "N/A",
   };
 
+  const dailyModelMap = new Map<string, Map<string, number>>();
+  for (const contrib of graph.contributions) {
+    const dateStr = contrib.date;
+    if (!dailyModelMap.has(dateStr)) {
+      dailyModelMap.set(dateStr, new Map());
+    }
+    const modelMap = dailyModelMap.get(dateStr)!;
+    for (const source of contrib.sources) {
+      const modelId = source.modelId;
+      const tokens = source.tokens.input + source.tokens.output + source.tokens.cacheRead;
+      modelMap.set(modelId, (modelMap.get(modelId) || 0) + tokens);
+    }
+  }
+
+  const chartData: ChartDataPoint[] = Array.from(dailyModelMap.entries())
+    .map(([date, modelMap]) => {
+      const models = Array.from(modelMap.entries()).map(([modelId, tokens]) => ({
+        modelId,
+        tokens,
+        color: getModelColor(modelId),
+      }));
+      return {
+        date,
+        models,
+        total: models.reduce((sum, m) => sum + m.tokens, 0),
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const modelTokensMap = new Map<string, { input: number; output: number; cost: number }>();
+  for (const e of modelEntries) {
+    const existing = modelTokensMap.get(e.model) || { input: 0, output: 0, cost: 0 };
+    modelTokensMap.set(e.model, {
+      input: existing.input + e.input,
+      output: existing.output + e.output,
+      cost: existing.cost + e.cost,
+    });
+  }
+
+  const totalTokensSum = stats.totalTokens || 1;
+  const topModels: ModelWithPercentage[] = Array.from(modelTokensMap.entries())
+    .map(([modelId, data]) => {
+      const totalTokens = data.input + data.output;
+      return {
+        modelId,
+        percentage: (totalTokens / totalTokensSum) * 100,
+        inputTokens: data.input,
+        outputTokens: data.output,
+        totalTokens,
+        cost: data.cost,
+      };
+    })
+    .sort((a, b) => b.cost - a.cost);
+
   return {
     modelEntries,
     dailyEntries,
@@ -194,6 +263,8 @@ async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
     stats,
     totalCost: report.totalCost,
     modelCount: modelEntries.length,
+    chartData,
+    topModels,
   };
 }
 

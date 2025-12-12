@@ -9,7 +9,8 @@ export function Header({ activeTab }: HeaderProps) {
   return (
     <Box paddingX={1} paddingY={0} justifyContent="space-between">
       <Box gap={2}>
-        <Tab name="Model" active={activeTab === "model"} />
+        <Tab name="Overview" active={activeTab === "overview"} />
+        <Tab name="Models" active={activeTab === "model"} />
         <Tab name="Daily" active={activeTab === "daily"} />
         <Tab name="Stats" active={activeTab === "stats"} />
       </Box>

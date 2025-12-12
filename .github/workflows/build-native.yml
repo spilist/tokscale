@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "core/package.json"
+      - "packages/core/package.json"
   workflow_dispatch:
 
 env:
@@ -26,7 +26,7 @@ jobs:
       - name: Check if version changed
         id: check
         run: |
-          if git diff HEAD~1 HEAD -- core/package.json | grep -E '^[+-]\s*"version"'; then
+          if git diff HEAD~1 HEAD -- packages/core/package.json | grep -E '^[+-]\s*"version"'; then
             echo "Version changed"
             echo "version_changed=true" >> $GITHUB_OUTPUT
           else
@@ -46,45 +46,48 @@ jobs:
           - host: macos-latest
             target: x86_64-apple-darwin
             build: |
-              cd core
-              yarn build:platform --target x86_64-apple-darwin
+              cd packages/core
+              bun run build:platform --target x86_64-apple-darwin
               strip -x *.node
           - host: macos-latest
             target: aarch64-apple-darwin
             build: |
-              cd core
-              yarn build:platform --target aarch64-apple-darwin
+              cd packages/core
+              bun run build:platform --target aarch64-apple-darwin
               strip -x *.node
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             build: |
-              cd core
-              yarn build:platform --target x86_64-unknown-linux-gnu --use-napi-cross
+              cd packages/core
+              bun run build:platform --target x86_64-unknown-linux-gnu --use-napi-cross
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             build: |
-              cd core
-              yarn build:platform --target x86_64-unknown-linux-musl -x
+              cd packages/core
+              bun run build:platform --target x86_64-unknown-linux-musl -x
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             build: |
-              cd core
-              yarn build:platform --target aarch64-unknown-linux-gnu --use-napi-cross
+              cd packages/core
+              bun run build:platform --target aarch64-unknown-linux-gnu --use-napi-cross
           - host: windows-latest
             target: x86_64-pc-windows-msvc
             build: |
-              cd core
-              yarn build:platform
+              cd packages/core
+              bun run build:platform
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-          cache-dependency-path: core/yarn.lock
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -101,8 +104,8 @@ jobs:
             ~/.cargo/git/db/
             ~/.napi-rs
             .cargo-cache
-            core/target/
-          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-${{ hashFiles('core/Cargo.lock') }}
+            packages/core/target/
+          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}-${{ hashFiles('packages/core/Cargo.lock') }}
 
       - uses: mlugg/setup-zig@v2
         if: ${{ contains(matrix.settings.target, 'musl') }}
@@ -118,8 +121,8 @@ jobs:
           tool: cargo-zigbuild
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
-        working-directory: core
+        run: bun install --frozen-lockfile
+        working-directory: packages/core
 
       - name: Build
         run: ${{ matrix.settings.build }}
@@ -129,7 +132,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: core/*.node
+          path: packages/core/*.node
           if-no-files-found: error
 
   publish-core:
@@ -143,6 +146,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -151,16 +159,16 @@ jobs:
           scope: "@0xinevitable"
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
-        working-directory: core
+        run: bun install --frozen-lockfile
+        working-directory: packages/core
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: core/artifacts
+          path: packages/core/artifacts
 
       - name: Move artifacts
-        working-directory: core
+        working-directory: packages/core
         run: |
           for dir in artifacts/bindings-*/; do
             cp "$dir"*.node . 2>/dev/null || true
@@ -168,7 +176,7 @@ jobs:
           ls -la *.node
 
       - name: Publish Core
-        working-directory: core
+        working-directory: packages/core
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -184,6 +192,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -192,10 +205,10 @@ jobs:
           scope: "@0xinevitable"
 
       - name: Install dependencies
-        run: yarn install
+        run: bun install
 
       - name: Build CLI
-        run: yarn workspace @0xinevitable/token-tracker build
+        run: bun run --cwd packages/cli build
 
       - name: Publish CLI
         working-directory: packages/cli

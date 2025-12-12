@@ -17,11 +17,17 @@ Get real-time pricing calculations using [LiteLLM's pricing data](https://github
 
 ## Features
 
-- **Multi-platform support** - Track usage across OpenCode, Claude Code, Codex CLI, and Gemini CLI
+- **Interactive TUI Mode** - Beautiful terminal UI powered by OpenTUI (default mode)
+  - 4 interactive views: Overview, Models, Daily, Stats
+  - Keyboard & mouse navigation
+  - GitHub-style contribution graph with 9 color themes
+  - Real-time filtering and sorting
+  - Zero flicker rendering (native Zig engine)
+- **Multi-platform support** - Track usage across OpenCode, Claude Code, Codex CLI, Cursor IDE, and Gemini CLI
 - **Real-time pricing** - Fetches current pricing from LiteLLM with 1-hour disk cache
 - **Detailed breakdowns** - Input, output, cache read/write, and reasoning token tracking
 - **Native Rust core** - All parsing and aggregation done in Rust for 10x faster processing
-- **GitHub-style visualization** - Interactive contribution graph with 2D and 3D views
+- **Web visualization** - Interactive contribution graph with 2D and 3D views
 - **Dark/Light/System themes** - GitHub Primer design system with 3-way theme toggle
 - **Flexible filtering** - Filter by platform, date range, or year
 - **Export to JSON** - Generate data for external visualization tools
@@ -32,6 +38,7 @@ Get real-time pricing calculations using [LiteLLM's pricing data](https://github
 ### Prerequisites
 
 - Node.js 18+
+- Bun (for TUI development mode)
 - (Optional) Rust toolchain for native module
 
 ### Quick Start
@@ -41,11 +48,14 @@ Get real-time pricing calculations using [LiteLLM's pricing data](https://github
 git clone https://github.com/wakeru-ai/token-usage-tracker.git
 cd token-tracker
 
+# Install Bun (if not already installed)
+curl -fsSL https://bun.sh/install | bash
+
 # Install dependencies
-yarn install
+bun install
 
 # Run the CLI
-yarn dev
+bun run cli
 ```
 
 ### Building the Native Module (Optional)
@@ -54,10 +64,10 @@ The native Rust module provides ~10x faster processing through parallel file sca
 
 ```bash
 # Build the native core
-yarn build:core
+bun run build:core
 
 # Verify installation
-yarn dev graph --benchmark
+bun run cli graph --benchmark
 ```
 
 ## Usage
@@ -65,18 +75,41 @@ yarn dev graph --benchmark
 ### Basic Commands
 
 ```bash
-# Show usage breakdown by model (default)
+# Launch interactive TUI (default)
 token-tracker
 
-# Show usage breakdown by model
-token-tracker models
+# Launch TUI with specific tab
+token-tracker models    # Models tab
+token-tracker monthly   # Daily tab
 
-# Show monthly usage report  
-token-tracker monthly
+# Use legacy CLI table output
+token-tracker --light
+token-tracker models --light
+
+# Launch TUI explicitly
+token-tracker tui
 
 # Export contribution graph data as JSON
 token-tracker graph --output data.json
 ```
+
+### TUI Features
+
+The interactive TUI mode provides:
+
+- **4 Views**: Overview (chart + top models), Models, Daily, Stats (contribution graph)
+- **Keyboard Navigation**:
+  - `1-4` or `←/→/Tab`: Switch views
+  - `↑/↓`: Navigate lists
+  - `c/n/t`: Sort by cost/name/tokens
+  - `1-5`: Toggle sources (OpenCode/Claude/Codex/Cursor/Gemini)
+  - `p`: Cycle through 9 color themes
+  - `r`: Refresh data
+  - `e`: Export to JSON
+  - `q`: Quit
+- **Mouse Support**: Click tabs, buttons, and filters
+- **Themes**: Green, Halloween, Teal, Blue, Pink, Purple, Orange, Monochrome, YlGnBu
+- **Settings Persistence**: Theme preference saved to `~/.config/token-tracker/tui-settings.json`
 
 ### Filtering by Platform
 
@@ -160,17 +193,25 @@ token-tracker logout
 
 ```
 token-tracker/
-├── src/                    # TypeScript CLI
+├── packages/cli/src/       # TypeScript CLI
 │   ├── cli.ts              # Commander.js entry point
+│   ├── tui/                # OpenTUI interactive interface
+│   │   ├── App.tsx         # Main TUI app (Solid.js)
+│   │   ├── components/     # TUI components
+│   │   ├── hooks/          # Data fetching & state
+│   │   ├── config/         # Themes & settings
+│   │   ├── utils/          # Formatting utilities
+│   │   └── types/          # TypeScript types
 │   ├── opencode.ts         # OpenCode session parser
 │   ├── claudecode.ts       # Claude Code & Codex parser
 │   ├── gemini.ts           # Gemini CLI parser
+│   ├── cursor.ts           # Cursor IDE integration
 │   ├── graph.ts            # Graph data generation
 │   ├── pricing.ts          # LiteLLM pricing fetcher
 │   ├── table.ts            # Terminal table rendering
 │   └── native.ts           # Native module loader
 │
-├── core/                   # Rust native module (napi-rs)
+├── packages/core/          # Rust native module (napi-rs)
 │   ├── src/
 │   │   ├── lib.rs          # NAPI exports
 │   │   ├── scanner.rs      # Parallel file discovery
@@ -231,7 +272,9 @@ All heavy computation is done in Rust. The CLI requires the native module to run
 | Layer | Technology | Purpose |
 |-------|------------|---------|
 | CLI | [Commander.js](https://github.com/tj/commander.js) | Command-line parsing |
-| Tables | [cli-table3](https://github.com/cli-table/cli-table3) | Terminal table rendering |
+| TUI | [OpenTUI](https://github.com/sst/opentui) + [Solid.js](https://www.solidjs.com/) | Interactive terminal UI (zero-flicker rendering) |
+| Runtime | [Bun](https://bun.sh/) | Fast JavaScript runtime (required for TUI dev mode) |
+| Tables | [cli-table3](https://github.com/cli-table/cli-table3) | Terminal table rendering (legacy CLI) |
 | Colors | [picocolors](https://github.com/alexeyraspopov/picocolors) | Terminal colors |
 | Native | [napi-rs](https://napi.rs/) | Node.js bindings for Rust |
 | Parallelism | [Rayon](https://github.com/rayon-rs/rayon) | Data parallelism in Rust |
@@ -263,14 +306,11 @@ The native module also provides ~45% memory reduction through:
 ### Running Benchmarks
 
 ```bash
-# Run benchmarks with real data
-yarn bench:ts                    # TypeScript implementation
-yarn bench:rust                  # Rust implementation
+# Generate synthetic data
+cd benchmarks && bun run generate
 
-# Run with synthetic data
-yarn bench:generate              # Generate synthetic data first
-yarn bench:ts:synthetic          # Benchmark with synthetic data
-yarn bench:rust:synthetic
+# Run Rust benchmarks
+cd packages/core && bun run bench
 ```
 
 ## Frontend Visualization
@@ -365,50 +405,61 @@ cargo --version
 ### Setup
 
 ```bash
+# Install Bun (if not already installed)
+curl -fsSL https://bun.sh/install | bash
+
 # Install dependencies
-yarn install
+bun install
 
 # Build native module (optional but recommended)
-cd core && yarn build && cd ..
+bun run build:core
 
-# Run in development mode
-yarn dev
+# Run in development mode (launches TUI)
+cd packages/cli && bun src/cli.ts
+
+# Or use legacy CLI mode
+cd packages/cli && bun src/cli.ts --light
 ```
 
 ### Project Scripts
 
 | Script | Description |
 |--------|-------------|
-| `yarn dev` | Run CLI in development mode |
-| `yarn build:core` | Build native Rust module (release) |
-| `yarn build:core:debug` | Build native module (debug) |
-| `yarn bench:generate` | Generate synthetic benchmark data |
-| `yarn bench:ts` | Run TypeScript benchmarks |
-| `yarn bench:rust` | Run Rust native benchmarks |
+| `bun run cli` | Run CLI in development mode (TUI with Bun) |
+| `bun run build:core` | Build native Rust module (release) |
+| `bun run build:cli` | Build CLI TypeScript to dist/ |
+| `bun run build` | Build both core and CLI |
+| `bun run dev:frontend` | Run frontend development server |
+
+**Package-specific scripts** (from within package directories):
+- `packages/cli`: `bun run dev`, `bun run dev:node`, `bun run tui`
+- `packages/core`: `bun run build:debug`, `bun run test`, `bun run bench`
+
+**Note**: This project uses **Bun** as the package manager and runtime. TUI requires Bun due to OpenTUI's native modules.
 
 ### Testing
 
 ```bash
 # Test native module (Rust)
-cd core
-yarn test:rust      # Cargo tests
-yarn test           # Node.js integration tests
-yarn test:all       # Both
+cd packages/core
+bun run test:rust      # Cargo tests
+bun run test           # Node.js integration tests
+bun run test:all       # Both
 ```
 
 ### Native Module Development
 
 ```bash
-cd core
+cd packages/core
 
 # Build in debug mode (faster compilation)
-yarn build:debug
+bun run build:debug
 
 # Build in release mode (optimized)
-yarn build
+bun run build
 
 # Run Rust benchmarks
-yarn bench
+bun run bench
 ```
 
 ## Supported Platforms
@@ -571,7 +622,7 @@ Contributions are welcome! Please follow these steps:
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests (`cd core && yarn test:all`)
+4. Run tests (`cd packages/core && bun run test:all`)
 5. Commit your changes (`git commit -m 'Add amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
@@ -589,6 +640,8 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
+- [OpenTUI](https://github.com/sst/opentui) for zero-flicker terminal UI framework
+- [Solid.js](https://www.solidjs.com/) for reactive rendering
 - [LiteLLM](https://github.com/BerriAI/litellm) for pricing data
 - [napi-rs](https://napi.rs/) for Rust/Node.js bindings
 - [Isometric Contributions](https://github.com/jasonlong/isometric-contributions) for 3D graph inspiration

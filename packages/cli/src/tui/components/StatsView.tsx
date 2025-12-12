@@ -23,7 +23,7 @@ export function StatsView(props: StatsViewProps) {
     return n.toString();
   };
 
-  const grid = () => buildContributionGrid(props.data.contributions);
+  const grid = () => props.data.contributionGrid;
 
   return (
     <box flexDirection="column" gap={1}>
@@ -48,8 +48,7 @@ export function StatsView(props: StatsViewProps) {
               <For each={grid()[dayIndex()] || []}>
                 {(cell) => (
                   <text
-                    fg={cell.level === 0 ? "gray" : undefined}
-                    backgroundColor={cell.level > 0 ? getGradeColor(palette(), cell.level as 0 | 1 | 2 | 3 | 4) : undefined}
+                    fg={cell.level === 0 ? "gray" : getGradeColor(palette(), cell.level as 0 | 1 | 2 | 3 | 4)}
                   >
                     {cell.level === 0 ? "·" : "█"}
                   </text>
@@ -66,8 +65,7 @@ export function StatsView(props: StatsViewProps) {
           <For each={[0, 1, 2, 3, 4]}>
             {(level) => (
               <text
-                fg={level === 0 ? "gray" : undefined}
-                backgroundColor={level > 0 ? getGradeColor(palette(), level as 0 | 1 | 2 | 3 | 4) : undefined}
+                fg={level === 0 ? "gray" : getGradeColor(palette(), level as 0 | 1 | 2 | 3 | 4)}
               >
                 {level === 0 ? "·" : "█"}
               </text>
@@ -126,29 +124,4 @@ export function StatsView(props: StatsViewProps) {
   );
 }
 
-interface GridCell {
-  date: string | null;
-  level: number;
-}
 
-function buildContributionGrid(contributions: TUIData["contributions"]): GridCell[][] {
-  const grid: GridCell[][] = Array.from({ length: 7 }, () => []);
-
-  const today = new Date();
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - 364);
-
-  const contributionMap = new Map(contributions.map(c => [c.date, c.level]));
-
-  const currentDate = new Date(startDate);
-  while (currentDate <= today) {
-    const dateStr = currentDate.toISOString().split("T")[0];
-    const dayOfWeek = currentDate.getDay();
-    const level = contributionMap.get(dateStr) || 0;
-
-    grid[dayOfWeek].push({ date: dateStr, level });
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  return grid;
-}

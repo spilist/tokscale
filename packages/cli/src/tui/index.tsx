@@ -5,7 +5,7 @@ export async function launchTUI() {
   await render(() => <App />, {
     exitOnCtrlC: false,
     useAlternateScreen: true,
-    useMouse: false,
+    useMouse: true,
     targetFps: 60,
     useKittyKeyboard: {},
   } as any);

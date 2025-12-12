@@ -54,6 +54,24 @@ declare module "@opentui/solid" {
 }
 
 declare namespace JSX {
+  interface MouseEvent {
+    x: number;
+    y: number;
+    button: number;
+    type: "down" | "up" | "move" | "drag" | "scroll";
+  }
+
+  interface MouseEventHandlers {
+    onMouse?: (event: MouseEvent) => void;
+    onMouseDown?: (event: MouseEvent) => void;
+    onMouseUp?: (event: MouseEvent) => void;
+    onMouseMove?: (event: MouseEvent) => void;
+    onMouseDrag?: (event: MouseEvent) => void;
+    onMouseOver?: (event: MouseEvent) => void;
+    onMouseOut?: (event: MouseEvent) => void;
+    onMouseScroll?: (event: MouseEvent) => void;
+  }
+
   interface IntrinsicElements {
     box: {
       flexDirection?: "row" | "column";
@@ -96,7 +114,7 @@ declare namespace JSX {
       borderLeft?: boolean;
       overflow?: "visible" | "hidden" | "scroll";
       children?: unknown;
-    };
+    } & MouseEventHandlers;
     text: {
       fg?: string;
       bg?: string;
@@ -109,6 +127,6 @@ declare namespace JSX {
       inverse?: boolean;
       wrap?: "wrap" | "truncate" | "truncate-start" | "truncate-middle" | "truncate-end";
       children?: unknown;
-    };
+    } & MouseEventHandlers;
   }
 }

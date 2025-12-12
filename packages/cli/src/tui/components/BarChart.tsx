@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js";
+import { For, Show, createMemo } from "solid-js";
 
 export interface ChartDataPoint {
   date: string;
@@ -13,6 +13,17 @@ interface BarChartProps {
 }
 
 const BLOCKS = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+
+const repeatCache = new Map<string, string>();
+function getRepeatedString(char: string, count: number): string {
+  const key = `${char}:${count}`;
+  let cached = repeatCache.get(key);
+  if (!cached) {
+    cached = char.repeat(count);
+    repeatCache.set(key, cached);
+  }
+  return cached;
+}
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
@@ -32,39 +43,58 @@ export function BarChart(props: BarChartProps) {
   const height = () => props.height;
 
   const safeHeight = () => Math.max(height(), 1);
-  const maxTotal = () => Math.max(...data().map((d) => d.total), 1);
+  
+  const maxTotal = createMemo(() => {
+    const arr = data();
+    if (arr.length === 0) return 1;
+    let max = arr[0].total;
+    for (let i = 1; i < arr.length; i++) {
+      if (arr[i].total > max) max = arr[i].total;
+    }
+    return Math.max(max, 1);
+  });
+
   const chartWidth = () => Math.max(width() - 8, 20);
   const barWidth = () => Math.max(1, Math.floor(chartWidth() / Math.min(data().length, 52)));
   const visibleBars = () => Math.min(data().length, Math.floor(chartWidth() / barWidth()));
-  const visibleData = () => data().slice(-visibleBars());
+  const visibleData = createMemo(() => data().slice(-visibleBars()));
 
-  const rowIndices = () => {
-    const indices: number[] = [];
-    for (let i = safeHeight() - 1; i >= 0; i--) {
-      indices.push(i);
+  const rowIndices = createMemo(() => {
+    const sh = safeHeight();
+    const indices: number[] = new Array(sh);
+    for (let i = 0; i < sh; i++) {
+      indices[i] = sh - 1 - i;
     }
     return indices;
-  };
+  });
 
-  const dateLabels = () => {
-    const labels: string[] = [];
+  const dateLabels = createMemo(() => {
     const vd = visibleData();
-    if (vd.length > 0) {
-      const labelInterval = Math.max(1, Math.floor(vd.length / 3));
-      for (let i = 0; i < vd.length; i += labelInterval) {
-        const dateStr = vd[i].date;
-        const d = new Date(dateStr);
-        const label = isNaN(d.getTime())
-          ? dateStr.slice(5)
-          : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        labels.push(label);
+    if (vd.length === 0) return [];
+    
+    const labelInterval = Math.max(1, Math.floor(vd.length / 3));
+    const labels: string[] = [];
+    
+    for (let i = 0; i < vd.length; i += labelInterval) {
+      const dateStr = vd[i].date;
+      const parts = dateStr.split("-");
+      if (parts.length === 3) {
+        const month = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        labels.push(`${monthNames[month - 1]} ${day}`);
+      } else {
+        labels.push(dateStr.slice(5));
       }
     }
     return labels;
-  };
+  });
 
   const axisWidth = () => Math.min(chartWidth(), visibleBars() * barWidth());
-  const labelPadding = () => dateLabels().length > 0 ? Math.floor(axisWidth() / dateLabels().length) : 0;
+  const labelPadding = () => {
+    const labels = dateLabels();
+    return labels.length > 0 ? Math.floor(axisWidth() / labels.length) : 0;
+  };
 
   const getBarContent = (point: ChartDataPoint, row: number): { char: string; color: string } => {
     const mt = maxTotal();
@@ -75,18 +105,18 @@ export function BarChart(props: BarChartProps) {
     const bw = barWidth();
 
     if (point.total <= prevThreshold) {
-      return { char: " ".repeat(bw), color: "dim" };
+      return { char: getRepeatedString(" ", bw), color: "dim" };
     }
 
     const color = getDominantColor(point.models);
 
     if (point.total >= rowThreshold) {
-      return { char: "█".repeat(bw), color };
+      return { char: getRepeatedString("█", bw), color };
     }
 
     const ratio = thresholdDiff > 0 ? (point.total - prevThreshold) / thresholdDiff : 1;
     const blockIndex = Math.min(8, Math.max(1, Math.floor(ratio * 8)));
-    return { char: BLOCKS[blockIndex].repeat(bw), color };
+    return { char: getRepeatedString(BLOCKS[blockIndex], bw), color };
   };
 
   return (
@@ -113,7 +143,7 @@ export function BarChart(props: BarChartProps) {
         </For>
         <box flexDirection="row">
           <text dim>{"     0│"}</text>
-          <text dim>{"─".repeat(axisWidth())}</text>
+          <text dim>{getRepeatedString("─", axisWidth())}</text>
         </box>
         <Show when={dateLabels().length > 0}>
           <box flexDirection="row">

@@ -1,4 +1,4 @@
-import { For } from "solid-js";
+import { For, createMemo } from "solid-js";
 import type { TUIData, SortType } from "../hooks/useData.js";
 
 interface DailyViewProps {
@@ -10,17 +10,21 @@ interface DailyViewProps {
 }
 
 export function DailyView(props: DailyViewProps) {
-  const sortedEntries = () => {
-    return [...props.data.dailyEntries].sort((a, b) => {
+  const sortedEntries = createMemo(() => {
+    const entries = props.data.dailyEntries;
+    const sortBy = props.sortBy;
+    const sortDesc = props.sortDesc;
+    
+    return [...entries].sort((a, b) => {
       let cmp = 0;
-      if (props.sortBy === "cost") cmp = a.cost - b.cost;
-      else if (props.sortBy === "tokens") cmp = a.total - b.total;
+      if (sortBy === "cost") cmp = a.cost - b.cost;
+      else if (sortBy === "tokens") cmp = a.total - b.total;
       else cmp = a.date.localeCompare(b.date);
-      return props.sortDesc ? -cmp : cmp;
+      return sortDesc ? -cmp : cmp;
     });
-  };
+  });
 
-  const visibleEntries = () => sortedEntries().slice(0, props.height - 3);
+  const visibleEntries = createMemo(() => sortedEntries().slice(0, props.height - 3));
 
   const formatNum = (n: number) => {
     if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;

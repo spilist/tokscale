@@ -15,6 +15,9 @@ export type TabType = "overview" | "model" | "daily" | "stats";
 export type SortType = "cost" | "name" | "tokens";
 export type SourceType = "opencode" | "claude" | "codex" | "cursor" | "gemini";
 
+const TABS: readonly TabType[] = ["overview", "model", "daily", "stats"] as const;
+const PALETTE_NAMES = getPaletteNames();
+
 export function App() {
   const terminalDimensions = useTerminalDimensions();
   const columns = () => terminalDimensions().width;
@@ -40,6 +43,26 @@ export function App() {
   const overviewListHeight = () => Math.max(4, contentHeight() - overviewChartHeight() - 4);
   const overviewItemsPerPage = () => Math.max(1, Math.floor(overviewListHeight() / 2));
 
+  const handleSourceToggle = (source: SourceType) => {
+    const newSources = new Set(enabledSources());
+    if (newSources.has(source)) newSources.delete(source);
+    else newSources.add(source);
+    setEnabledSources(newSources);
+  };
+
+  const handlePaletteChange = () => {
+    const currentIdx = PALETTE_NAMES.indexOf(colorPalette());
+    const nextIdx = (currentIdx + 1) % PALETTE_NAMES.length;
+    const newPalette = PALETTE_NAMES[nextIdx];
+    saveSettings({ colorPalette: newPalette });
+    setColorPalette(newPalette);
+  };
+
+  const handleSortChange = (sort: SortType) => {
+    setSortBy(sort);
+    setSortDesc(sort !== "name");
+  };
+
   useKeyboard((key) => {
     if (key.name === "q") {
       process.exit(0);
@@ -50,16 +73,14 @@ export function App() {
       return;
     }
 
-    const tabs: TabType[] = ["overview", "model", "daily", "stats"];
-    
     const cycleTabForward = (current: TabType): TabType => {
-      const idx = tabs.indexOf(current);
-      return tabs[(idx + 1) % tabs.length];
+      const idx = TABS.indexOf(current);
+      return TABS[(idx + 1) % TABS.length];
     };
 
     const cycleTabBackward = (current: TabType): TabType => {
-      const idx = tabs.indexOf(current);
-      return tabs[(idx - 1 + tabs.length) % tabs.length];
+      const idx = TABS.indexOf(current);
+      return TABS[(idx - 1 + TABS.length) % TABS.length];
     };
 
     if (key.name === "tab" || key.name === "d" || key.name === "right") {
@@ -93,27 +114,15 @@ export function App() {
     }
 
     if (key.name === "p") {
-      const palettes = getPaletteNames();
-      const currentIdx = palettes.indexOf(colorPalette());
-      const nextIdx = (currentIdx + 1) % palettes.length;
-      const newPalette = palettes[nextIdx];
-      saveSettings({ colorPalette: newPalette });
-      setColorPalette(newPalette);
+      handlePaletteChange();
       return;
     }
 
-    const toggleSource = (source: SourceType) => {
-      const newSources = new Set(enabledSources());
-      if (newSources.has(source)) newSources.delete(source);
-      else newSources.add(source);
-      setEnabledSources(newSources);
-    };
-
-    if (key.name === "1") { toggleSource("opencode"); return; }
-    if (key.name === "2") { toggleSource("claude"); return; }
-    if (key.name === "3") { toggleSource("codex"); return; }
-    if (key.name === "4") { toggleSource("cursor"); return; }
-    if (key.name === "5") { toggleSource("gemini"); return; }
+    if (key.name === "1") { handleSourceToggle("opencode"); return; }
+    if (key.name === "2") { handleSourceToggle("claude"); return; }
+    if (key.name === "3") { handleSourceToggle("codex"); return; }
+    if (key.name === "4") { handleSourceToggle("cursor"); return; }
+    if (key.name === "5") { handleSourceToggle("gemini"); return; }
 
     if (key.name === "up") {
       if (activeTab() === "overview" && scrollOffset() > 0) {
@@ -152,9 +161,15 @@ export function App() {
     }
   });
 
+  const handleTabClick = (tab: TabType) => {
+    setActiveTab(tab);
+    setSelectedIndex(0);
+    setScrollOffset(0);
+  };
+
   return (
     <box flexDirection="column" width={columns()} height={rows()}>
-      <Header activeTab={activeTab()} />
+      <Header activeTab={activeTab()} onTabClick={handleTabClick} />
 
       <box flexDirection="column" flexGrow={1} paddingX={1}>
         <Switch>
@@ -212,13 +227,17 @@ export function App() {
       <Footer
         enabledSources={enabledSources()}
         sortBy={sortBy()}
-        totalCost={data()?.totalCost ?? 0}
+        totals={data()?.totals}
         modelCount={data()?.modelCount ?? 0}
         activeTab={activeTab()}
         scrollStart={scrollOffset()}
         scrollEnd={Math.min(scrollOffset() + overviewItemsPerPage(), data()?.topModels.length ?? 0)}
         totalItems={data()?.topModels.length}
         colorPalette={colorPalette()}
+        onSourceToggle={handleSourceToggle}
+        onSortChange={handleSortChange}
+        onPaletteChange={handlePaletteChange}
+        onRefresh={refresh}
       />
     </box>
   );

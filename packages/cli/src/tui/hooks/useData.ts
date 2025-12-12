@@ -61,15 +61,58 @@ export interface ModelWithPercentage {
   cost: number;
 }
 
+export interface GridCell {
+  date: string | null;
+  level: number;
+}
+
+export interface TotalBreakdown {
+  input: number;
+  output: number;
+  cacheWrite: number;
+  cacheRead: number;
+  total: number;
+  cost: number;
+}
+
 export interface TUIData {
   modelEntries: ModelEntry[];
   dailyEntries: DailyEntry[];
   contributions: ContributionDay[];
+  contributionGrid: GridCell[][];
   stats: Stats;
   totalCost: number;
+  totals: TotalBreakdown;
   modelCount: number;
   chartData: ChartDataPoint[];
   topModels: ModelWithPercentage[];
+}
+
+function buildContributionGrid(contributions: ContributionDay[]): GridCell[][] {
+  const grid: GridCell[][] = Array.from({ length: 7 }, () => []);
+
+  const today = new Date();
+  const startYear = today.getFullYear();
+  const startMonth = today.getMonth();
+  const startDay = today.getDate() - 364;
+  const startDate = new Date(startYear, startMonth, startDay);
+
+  const contributionMap = new Map(contributions.map(c => [c.date, c.level]));
+
+  const currentDate = new Date(startDate);
+  while (currentDate <= today) {
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+    const day = String(currentDate.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    const dayOfWeek = currentDate.getDay();
+    const level = contributionMap.get(dateStr) || 0;
+
+    grid[dayOfWeek].push({ date: dateStr, level });
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return grid;
 }
 
 async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
@@ -145,12 +188,17 @@ async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
   }
   const dailyEntries = Array.from(dailyMap.values()).sort((a, b) => b.date.localeCompare(a.date));
 
-  const maxCost = Math.max(...dailyEntries.map(d => d.cost), 1);
+  let maxCost = 1;
+  for (const d of dailyEntries) {
+    if (d.cost > maxCost) maxCost = d.cost;
+  }
   const contributions: ContributionDay[] = dailyEntries.map(d => ({
     date: d.date,
     cost: d.cost,
     level: Math.min(4, Math.floor((d.cost / maxCost) * 5)),
   }));
+
+  const contributionGrid = buildContributionGrid(contributions);
 
   const modelCosts = new Map<string, number>();
   for (const e of modelEntries) {
@@ -168,12 +216,39 @@ async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
 
   let currentStreak = 0;
   let longestStreak = 0;
-  let streak = 0;
+  
   const sortedDates = dailyEntries.map(d => d.date).sort();
-  for (let i = 0; i < sortedDates.length; i++) {
-    if (i === 0) {
-      streak = 1;
-    } else {
+  if (sortedDates.length > 0) {
+    const todayParts = new Date().toISOString().split("T")[0].split("-").map(Number);
+    const todayUTC = Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]);
+    
+    let streak = 0;
+    for (let i = sortedDates.length - 1; i >= 0; i--) {
+      const dateParts = sortedDates[i].split("-").map(Number);
+      const dateUTC = Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]);
+      const daysFromToday = Math.round((todayUTC - dateUTC) / (1000 * 60 * 60 * 24));
+      
+      if (i === sortedDates.length - 1) {
+        if (daysFromToday <= 1) {
+          streak = 1;
+        } else {
+          break;
+        }
+      } else {
+        const prevParts = sortedDates[i + 1].split("-").map(Number);
+        const prevUTC = Date.UTC(prevParts[0], prevParts[1] - 1, prevParts[2]);
+        const diffDays = Math.round((prevUTC - dateUTC) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+    }
+    currentStreak = streak;
+    
+    streak = 1;
+    for (let i = 1; i < sortedDates.length; i++) {
       const prevParts = sortedDates[i - 1].split("-").map(Number);
       const currParts = sortedDates[i].split("-").map(Number);
       const prevDate = Date.UTC(prevParts[0], prevParts[1] - 1, prevParts[2]);
@@ -186,9 +261,8 @@ async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
         streak = 1;
       }
     }
+    longestStreak = Math.max(longestStreak, streak);
   }
-  longestStreak = Math.max(longestStreak, streak);
-  currentStreak = streak;
 
   const stats: Stats = {
     favoriteModel,
@@ -256,12 +330,23 @@ async function loadData(enabledSources: Set<SourceType>): Promise<TUIData> {
     })
     .sort((a, b) => b.cost - a.cost);
 
+  const totals: TotalBreakdown = {
+    input: report.totalInput,
+    output: report.totalOutput,
+    cacheWrite: report.totalCacheWrite,
+    cacheRead: report.totalCacheRead,
+    total: report.totalInput + report.totalOutput + report.totalCacheWrite + report.totalCacheRead,
+    cost: report.totalCost,
+  };
+
   return {
     modelEntries,
     dailyEntries,
     contributions,
+    contributionGrid,
     stats,
     totalCost: report.totalCost,
+    totals,
     modelCount: modelEntries.length,
     chartData,
     topModels,

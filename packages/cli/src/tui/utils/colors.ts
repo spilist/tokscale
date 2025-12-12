@@ -12,18 +12,40 @@ export const PROVIDER_COLORS = {
 
 export type ProviderType = keyof typeof PROVIDER_COLORS;
 
+const PROVIDER_PATTERNS: readonly [RegExp, ProviderType][] = [
+  [/claude|sonnet|opus|haiku/i, "anthropic"],
+  [/gpt|^o1|^o3|codex|text-embedding|dall-e|whisper|tts/i, "openai"],
+  [/gemini/i, "google"],
+  [/deepseek/i, "deepseek"],
+  [/grok/i, "xai"],
+  [/llama|mixtral/i, "meta"],
+  [/^auto$|cursor/i, "cursor"],
+] as const;
+
+const providerCache = new Map<string, ProviderType>();
+const colorCache = new Map<string, string>();
+
 export function getProviderFromModel(modelId: string): ProviderType {
-  const lower = modelId.toLowerCase();
-  if (/claude|sonnet|opus|haiku/.test(lower)) return "anthropic";
-  if (/gpt|^o1|^o3|codex|text-embedding|dall-e|whisper|tts/.test(lower)) return "openai";
-  if (/gemini/.test(lower)) return "google";
-  if (/deepseek/.test(lower)) return "deepseek";
-  if (/grok/.test(lower)) return "xai";
-  if (/llama|mixtral/.test(lower)) return "meta";
-  if (/^auto$|cursor/.test(lower)) return "cursor";
-  return "unknown";
+  const cached = providerCache.get(modelId);
+  if (cached) return cached;
+
+  let provider: ProviderType = "unknown";
+  for (const [pattern, type] of PROVIDER_PATTERNS) {
+    if (pattern.test(modelId)) {
+      provider = type;
+      break;
+    }
+  }
+
+  providerCache.set(modelId, provider);
+  return provider;
 }
 
 export function getModelColor(modelId: string): string {
-  return PROVIDER_COLORS[getProviderFromModel(modelId)];
+  const cached = colorCache.get(modelId);
+  if (cached) return cached;
+
+  const color = PROVIDER_COLORS[getProviderFromModel(modelId)];
+  colorCache.set(modelId, color);
+  return color;
 }

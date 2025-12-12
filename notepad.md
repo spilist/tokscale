@@ -478,3 +478,83 @@ CLI tool to track token usage across OpenCode, Claude Code, Codex, and Gemini se
 
 **All commits pushed to origin/main**
 
+---
+
+[2025-12-12 22:57] - Task 1: Verify Zig is installed (OpenTUI Migration)
+
+### DISCOVERED ISSUES
+- Zig was not installed on the system (required for OpenTUI native build)
+
+### IMPLEMENTATION DECISIONS
+- Installed Zig via Homebrew: `brew install zig`
+- Installed version: 0.15.2
+- Dependencies installed: llvm@20 (1.5GB), lld@20 (5.6MB)
+
+### PROBLEMS FOR NEXT TASKS
+- None - Zig is ready for OpenTUI compilation
+
+### VERIFICATION RESULTS
+- Ran: `zig version` → 0.15.2
+- Installation successful via Homebrew
+
+### LEARNINGS
+- Zig 0.15.2 is current stable version
+- Requires LLVM as dependency (~1.5GB)
+- OpenTUI uses Zig for native terminal rendering
+
+Time taken: ~2 minutes
+
+---
+
+[2025-12-12 23:25] - OpenTUI Migration Complete
+
+### DISCOVERED ISSUES
+- OpenTUI requires Bun runtime (not compatible with Node.js/tsx)
+- Node.js ESM loader fails on .scm tree-sitter files
+- Top-level await in OpenTUI modules breaks tsx
+- OpenTUI text nodes cannot have nested JSX elements
+- TypeScript module resolution differs from Bun's runtime resolution
+
+### IMPLEMENTATION DECISIONS
+- Switched dev script from `tsx` to `bun` for TUI mode
+- Created custom type declarations (`opentui.d.ts`) for OpenTUI modules
+- Used template literals for all text content (OpenTUI requirement)
+- Converted all Ink patterns: `color` → `fg`, `dimColor` → `dim`, PascalCase → lowercase
+- Added theming feature with 9 color palettes directly in migration
+
+### PROBLEMS FOR NEXT TASKS
+- TypeScript LSP shows module resolution errors (runtime works fine with Bun)
+- May need to update CI/CD to use Bun for TUI tests
+- Need manual testing to verify TUI rendering quality
+
+### VERIFICATION RESULTS
+- CLI commands work: `bun src/cli.ts --help`, `bun src/cli.ts models`
+- TUI launches but needs interactive testing for full verification
+- Ink dependency removed from package.json
+
+### LEARNINGS
+- OpenTUI is designed for Bun, not Node.js
+- Text nodes must be pure strings (use template literals)
+- `useKeyboard` receives `key.name` not `input` string
+- `useTerminalDimensions` returns `{width, height}` object
+- `process.exit(0)` instead of `useApp().exit()`
+- Components are lowercase intrinsic elements: `<box>`, `<text>`
+
+Time taken: ~25 minutes
+
+---
+
+## OpenTUI Migration Summary
+
+| Phase | Status |
+|-------|--------|
+| 1. Zig + Setup | ✅ Complete |
+| 2. Core Migration | ✅ Complete |
+| 3. Component Migration | ✅ Complete |
+| 4. Cleanup | ✅ Complete |
+| 5. Theming | ✅ Complete |
+
+**Commit**: `4a1872f` feat(tui): migrate from Ink to OpenTUI with Bun runtime
+
+**Branch**: `feat/opentui-migration`
+

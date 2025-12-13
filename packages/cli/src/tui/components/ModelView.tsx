@@ -91,7 +91,6 @@ export function ModelView(props: ModelViewProps) {
           {costHeader().padStart(COST_COL_WIDTH)}
         </text>
       </box>
-      <box borderStyle="single" borderTop={false} borderLeft={false} borderRight={false} borderBottom borderColor="brightBlack" />
 
       <For each={formattedRows()}>
         {(row, i) => {

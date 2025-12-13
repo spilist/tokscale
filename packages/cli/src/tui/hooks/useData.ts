@@ -93,6 +93,44 @@ function calculatePeakHour(messages: Array<{ timestamp: number }>): string {
   return `${displayHour}${suffix}`;
 }
 
+function calculateLongestSession(messages: Array<{ sessionId: string; timestamp: number }>): string {
+  if (messages.length === 0) return "N/A";
+  
+  const sessions = new Map<string, number[]>();
+  for (const msg of messages) {
+    if (!msg.sessionId) continue;
+    const timestamps = sessions.get(msg.sessionId) || [];
+    timestamps.push(msg.timestamp);
+    sessions.set(msg.sessionId, timestamps);
+  }
+  
+  if (sessions.size === 0) return "N/A";
+  
+  let maxDurationMs = 0;
+  for (const [, timestamps] of sessions) {
+    if (timestamps.length < 2) continue;
+    const minTs = Math.min(...timestamps);
+    const maxTs = Math.max(...timestamps);
+    const duration = maxTs - minTs;
+    if (duration > maxDurationMs) {
+      maxDurationMs = duration;
+    }
+  }
+  
+  if (maxDurationMs === 0) return "N/A";
+  
+  const totalSeconds = Math.floor(maxDurationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else if (minutes > 0) {
+    return `${minutes}m`;
+  }
+  return `${totalSeconds}s`;
+}
+
 async function loadData(enabledSources: Set<SourceType>, dateFilters?: DateFilters): Promise<TUIData> {
   if (!isNativeAvailable()) {
     throw new Error("Native module not available");
@@ -253,7 +291,7 @@ async function loadData(enabledSources: Set<SourceType>, dateFilters?: DateFilte
     favoriteModel,
     totalTokens: report.totalInput + report.totalOutput + report.totalCacheRead + report.totalCacheWrite,
     sessions: report.totalMessages,
-    longestSession: "N/A",
+    longestSession: calculateLongestSession(localMessages?.messages || []),
     currentStreak,
     longestStreak,
     activeDays: dailyEntries.length,

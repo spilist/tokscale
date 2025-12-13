@@ -46,32 +46,26 @@ export function DailyView(props: DailyViewProps) {
       </box>
 
       <For each={visibleEntries()}>
-        {(entry, i) => {
-          const isSelected = () => i() === props.selectedIndex();
-          const stripe = () => (i() % 2 === 0 ? "brightBlack" : undefined);
-          const rowBg = () => (isSelected() ? "blue" : stripe());
-
-          return (
-            <box flexDirection="row">
-              <text
-                backgroundColor={rowBg()}
-                fg={isSelected() ? "white" : undefined}
-              >
-                {entry.date.padEnd(14)}
-                {formatTokensCompact(entry.input).padStart(14)}
-                {formatTokensCompact(entry.output).padStart(14)}
-                {formatTokensCompact(entry.cache).padStart(14)}
-                {formatTokensCompact(entry.total).padStart(16)}
-              </text>
-              <text
-                fg="green"
-                backgroundColor={rowBg()}
-              >
-                {formatCostFull(entry.cost).padStart(12)}
-              </text>
-            </box>
-          );
-        }}
+        {(entry, i) => (
+          <box flexDirection="row">
+            <text
+              backgroundColor={i() === props.selectedIndex() ? "blue" : (i() % 2 === 0 ? "brightBlack" : undefined)}
+              fg={i() === props.selectedIndex() ? "white" : undefined}
+            >
+              {entry.date.padEnd(14)}
+              {formatTokensCompact(entry.input).padStart(14)}
+              {formatTokensCompact(entry.output).padStart(14)}
+              {formatTokensCompact(entry.cache).padStart(14)}
+              {formatTokensCompact(entry.total).padStart(16)}
+            </text>
+            <text
+              fg="green"
+              backgroundColor={i() === props.selectedIndex() ? "blue" : (i() % 2 === 0 ? "brightBlack" : undefined)}
+            >
+              {formatCostFull(entry.cost).padStart(12)}
+            </text>
+          </box>
+        )}
       </For>
     </box>
   );

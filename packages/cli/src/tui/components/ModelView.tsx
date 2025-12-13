@@ -93,33 +93,30 @@ export function ModelView(props: ModelViewProps) {
       </box>
 
       <For each={formattedRows()}>
-        {(row, i) => {
-          const isSelected = () => i() === props.selectedIndex();
-          const stripe = () => (i() % 2 === 0 ? "brightBlack" : undefined);
-          const rowBg = () => (isSelected() ? "blue" : stripe());
-
-          return (
-            <box flexDirection="row">
-              <text fg={getModelColor(row.entry.model)} backgroundColor={rowBg()}>●</text>
-              <text
-                backgroundColor={rowBg()}
-                fg={isSelected() ? "white" : undefined}
-              >
-                {row.displayName.padEnd(row.nameWidth)}
-                {row.input.padStart(INPUT_COL_WIDTH)}
-                {row.output.padStart(OUTPUT_COL_WIDTH)}
-                {row.cache.padStart(CACHE_COL_WIDTH)}
-                {row.total.padStart(TOTAL_COL_WIDTH)}
-              </text>
-              <text
-                fg="green"
-                backgroundColor={rowBg()}
-              >
-                {row.cost.padStart(COST_COL_WIDTH)}
-              </text>
-            </box>
-          );
-        }}
+        {(row, i) => (
+          <box flexDirection="row">
+            <text 
+              fg={getModelColor(row.entry.model)} 
+              backgroundColor={i() === props.selectedIndex() ? "blue" : (i() % 2 === 0 ? "brightBlack" : undefined)}
+            >●</text>
+            <text
+              backgroundColor={i() === props.selectedIndex() ? "blue" : (i() % 2 === 0 ? "brightBlack" : undefined)}
+              fg={i() === props.selectedIndex() ? "white" : undefined}
+            >
+              {row.displayName.padEnd(row.nameWidth)}
+              {row.input.padStart(INPUT_COL_WIDTH)}
+              {row.output.padStart(OUTPUT_COL_WIDTH)}
+              {row.cache.padStart(CACHE_COL_WIDTH)}
+              {row.total.padStart(TOTAL_COL_WIDTH)}
+            </text>
+            <text
+              fg="green"
+              backgroundColor={i() === props.selectedIndex() ? "blue" : (i() % 2 === 0 ? "brightBlack" : undefined)}
+            >
+              {row.cost.padStart(COST_COL_WIDTH)}
+            </text>
+          </box>
+        )}
       </For>
     </box>
   );

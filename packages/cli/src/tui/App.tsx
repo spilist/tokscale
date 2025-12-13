@@ -1,4 +1,4 @@
-import { createSignal, Switch, Match } from "solid-js";
+import { createSignal, Switch, Match, onCleanup } from "solid-js";
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid";
 import clipboardy from "clipboardy";
 import { Header } from "./components/Header.js";
@@ -53,6 +53,19 @@ export function App(props: AppProps) {
   };
 
   const { data, loading, error, refresh } = useData(() => enabledSources(), dateFilters);
+
+  const [statusMessage, setStatusMessage] = createSignal<string | null>(null);
+  let statusTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  const showStatus = (msg: string, duration = 2000) => {
+    if (statusTimeout) clearTimeout(statusTimeout);
+    setStatusMessage(msg);
+    statusTimeout = setTimeout(() => setStatusMessage(null), duration);
+  };
+
+  onCleanup(() => {
+    if (statusTimeout) clearTimeout(statusTimeout);
+  });
 
   const contentHeight = () => Math.max(rows() - 6, 12);
   const overviewChartHeight = () => Math.max(5, Math.floor(contentHeight() * 0.35));
@@ -149,7 +162,9 @@ export function App(props: AppProps) {
       }
       
       if (textToCopy) {
-        clipboardy.write(textToCopy).catch(() => {});
+        clipboardy.write(textToCopy)
+          .then(() => showStatus("Copied to clipboard"))
+          .catch(() => showStatus("Failed to copy"));
       }
       return;
     }
@@ -214,8 +229,9 @@ export function App(props: AppProps) {
       import("node:fs")
         .then((fs) => {
           fs.writeFileSync(filename, JSON.stringify(exportData, null, 2));
+          showStatus(`Exported to ${filename}`);
         })
-        .catch(() => {});
+        .catch(() => showStatus("Export failed"));
       return;
     }
   });
@@ -292,6 +308,7 @@ export function App(props: AppProps) {
         scrollEnd={Math.min(scrollOffset() + overviewItemsPerPage(), data()?.topModels.length ?? 0)}
         totalItems={data()?.topModels.length}
         colorPalette={colorPalette()}
+        statusMessage={statusMessage()}
         onSourceToggle={handleSourceToggle}
         onSortChange={handleSortChange}
         onPaletteChange={handlePaletteChange}

@@ -27,27 +27,34 @@ export function DailyView(props: DailyViewProps) {
 
   const visibleEntries = createMemo(() => sortedEntries().slice(0, props.height - 3));
 
+  const sortArrow = () => (props.sortDesc ? "▼" : "▲");
+  const dateHeader = () => (props.sortBy === "name" ? `${sortArrow()} Date` : "Date");
+  const totalHeader = () => (props.sortBy === "tokens" ? `${sortArrow()} Total` : "Total");
+  const costHeader = () => (props.sortBy === "cost" ? `${sortArrow()} Cost` : "Cost");
+
   return (
     <box flexDirection="column">
       <box flexDirection="row">
         <text fg="cyan" bold>
-          {"  Date".padEnd(14)}
+          {`  ${dateHeader()}`.padEnd(14)}
           {"Input".padStart(14)}
           {"Output".padStart(14)}
           {"Cache".padStart(14)}
-          {"Total".padStart(16)}
-          {"Cost".padStart(12)}
+          {totalHeader().padStart(16)}
+          {costHeader().padStart(12)}
         </text>
       </box>
 
       <For each={visibleEntries()}>
         {(entry, i) => {
           const isSelected = () => i() === props.selectedIndex;
+          const stripe = () => (i() % 2 === 0 ? "brightBlack" : undefined);
+          const rowBg = () => (isSelected() ? "blue" : stripe());
 
           return (
             <box flexDirection="row">
               <text
-                backgroundColor={isSelected() ? "blue" : undefined}
+                backgroundColor={rowBg()}
                 fg={isSelected() ? "white" : undefined}
               >
                 {entry.date.padEnd(14)}
@@ -58,7 +65,7 @@ export function DailyView(props: DailyViewProps) {
               </text>
               <text
                 fg="green"
-                backgroundColor={isSelected() ? "blue" : undefined}
+                backgroundColor={rowBg()}
               >
                 {formatCostFull(entry.cost).padStart(12)}
               </text>

@@ -1,9 +1,9 @@
-import { Show, For, type Accessor } from "solid-js";
+import { Show, For, createMemo, type Accessor } from "solid-js";
 import { BarChart } from "./BarChart.js";
 import { Legend } from "./Legend.js";
-import { ModelListItem } from "./ModelListItem.js";
 import type { TUIData } from "../hooks/useData.js";
-import { formatCost } from "../utils/format.js";
+import { formatCost, formatTokens } from "../utils/format.js";
+import { getModelColor } from "../utils/colors.js";
 
 interface OverviewViewProps {
   data: TUIData;
@@ -43,15 +43,22 @@ export function OverviewView(props: OverviewViewProps) {
 
         <box flexDirection="column">
           <For each={visibleModels()}>
-            {(model, i) => (
-              <ModelListItem
-                modelId={model.modelId}
-                percentage={model.percentage}
-                inputTokens={model.inputTokens}
-                outputTokens={model.outputTokens}
-                isSelected={() => props.scrollOffset() + i() === props.selectedIndex()}
-              />
-            )}
+            {(model, i) => {
+              const isActive = createMemo(() => props.scrollOffset() + i() === props.selectedIndex());
+              const bgColor = createMemo(() => isActive() ? "blue" : undefined);
+              const color = () => getModelColor(model.modelId);
+              
+              return (
+                <box flexDirection="column">
+                  <box flexDirection="row" backgroundColor={bgColor()}>
+                    <text fg={color()} bg={bgColor()}>●</text>
+                    <text fg={isActive() ? "white" : undefined} bg={bgColor()}>{` ${model.modelId} `}</text>
+                    <text dim bg={bgColor()}>{`(${model.percentage.toFixed(1)}%)`}</text>
+                  </box>
+                  <text dim>{`  In: ${formatTokens(model.inputTokens)} · Out: ${formatTokens(model.outputTokens)}`}</text>
+                </box>
+              );
+            }}
           </For>
         </box>
 

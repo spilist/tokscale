@@ -1,5 +1,6 @@
 import { createSignal, Switch, Match } from "solid-js";
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid";
+import clipboardy from "clipboardy";
 import { Header } from "./components/Header.js";
 import { Footer } from "./components/Footer.js";
 import { ModelView } from "./components/ModelView.js";
@@ -108,6 +109,45 @@ export function App(props: AppProps) {
     }
 
     if (key.name === "c") {
+      if (key.meta || key.ctrl) {
+        const d = data();
+        if (!d) return;
+        
+        let textToCopy = "";
+        const tab = activeTab();
+        
+        if (tab === "model") {
+          const sorted = [...d.modelEntries].sort((a, b) => {
+            if (sortBy() === "cost") return sortDesc() ? b.cost - a.cost : a.cost - b.cost;
+            if (sortBy() === "tokens") return sortDesc() ? b.total - a.total : a.total - b.total;
+            return sortDesc() ? b.model.localeCompare(a.model) : a.model.localeCompare(b.model);
+          });
+          const entry = sorted[selectedIndex()];
+          if (entry) {
+            textToCopy = `${entry.source} ${entry.model}: ${entry.total.toLocaleString()} tokens, $${entry.cost.toFixed(2)}`;
+          }
+        } else if (tab === "daily") {
+          const sorted = [...d.dailyEntries].sort((a, b) => {
+            if (sortBy() === "cost") return sortDesc() ? b.cost - a.cost : a.cost - b.cost;
+            if (sortBy() === "tokens") return sortDesc() ? b.total - a.total : a.total - b.total;
+            return sortDesc() ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
+          });
+          const entry = sorted[selectedIndex()];
+          if (entry) {
+            textToCopy = `${entry.date}: ${entry.total.toLocaleString()} tokens, $${entry.cost.toFixed(2)}`;
+          }
+        } else if (tab === "overview") {
+          const model = d.topModels[scrollOffset() + selectedIndex()];
+          if (model) {
+            textToCopy = `${model.modelId}: ${model.totalTokens.toLocaleString()} tokens, $${model.cost.toFixed(2)}`;
+          }
+        }
+        
+        if (textToCopy) {
+          clipboardy.write(textToCopy).catch(() => {});
+        }
+        return;
+      }
       setSortBy("cost");
       setSortDesc(true);
       return;

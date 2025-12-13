@@ -40,7 +40,7 @@ function Tab(props: TabProps) {
       }
     >
       <box onMouseDown={handleClick}>
-        <text backgroundColor="cyan" fg="black" bold>{` ${props.name} `}</text>
+        <text bg="cyan" fg="white" bold>{` ${props.name} `}</text>
       </box>
     </Show>
   );

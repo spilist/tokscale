@@ -191,8 +191,12 @@ export function App(props: AppProps) {
     if (key.name === "5") { handleSourceToggle("gemini"); return; }
 
     if (key.name === "up") {
-      if (activeTab() === "overview" && scrollOffset() > 0) {
-        setScrollOffset(scrollOffset() - 1);
+      if (activeTab() === "overview") {
+        if (selectedIndex() > 0) {
+          setSelectedIndex(selectedIndex() - 1);
+        } else if (scrollOffset() > 0) {
+          setScrollOffset(scrollOffset() - 1);
+        }
       } else {
         setSelectedIndex(Math.max(0, selectedIndex() - 1));
       }
@@ -201,8 +205,13 @@ export function App(props: AppProps) {
 
     if (key.name === "down") {
       if (activeTab() === "overview") {
+        const maxVisible = Math.min(overviewItemsPerPage(), (data()?.topModels.length ?? 0) - scrollOffset());
         const maxOffset = Math.max(0, (data()?.topModels.length ?? 0) - overviewItemsPerPage());
-        setScrollOffset(Math.min(maxOffset, scrollOffset() + 1));
+        if (selectedIndex() < maxVisible - 1) {
+          setSelectedIndex(selectedIndex() + 1);
+        } else if (scrollOffset() < maxOffset) {
+          setScrollOffset(scrollOffset() + 1);
+        }
       } else {
         const d = data();
         const maxIndex = activeTab() === "model" 

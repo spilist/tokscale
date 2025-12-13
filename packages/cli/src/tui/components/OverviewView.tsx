@@ -44,7 +44,7 @@ export function OverviewView(props: OverviewViewProps) {
         <box flexDirection="column">
           <For each={visibleModels()}>
             {(model, i) => {
-              const isActive = createMemo(() => props.scrollOffset() + i() === props.selectedIndex());
+              const isActive = createMemo(() => i() === props.selectedIndex());
               const bgColor = createMemo(() => isActive() ? "blue" : undefined);
               const color = () => getModelColor(model.modelId);
               

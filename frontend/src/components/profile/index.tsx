@@ -202,7 +202,11 @@ export function ProfileTabBar({ activeTab, onTabChange }: ProfileTabBarProps) {
   return (
     <div
       className="inline-flex flex-row items-center rounded-[25px] border p-[6px]"
-      style={{ backgroundColor: "#1F1F20", borderColor: "#262627" }}
+      style={{
+        width: "fit-content",
+        backgroundColor: "#1F1F20",
+        borderColor: "#262627",
+      }}
     >
       {tabs.map((tab) => (
         <button

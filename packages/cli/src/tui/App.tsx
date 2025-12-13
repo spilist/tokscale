@@ -217,6 +217,7 @@ export function App(props: AppProps) {
                   sortDesc={sortDesc()}
                   selectedIndex={selectedIndex()}
                   height={contentHeight()}
+                  width={columns()}
                 />
               </Match>
               <Match when={activeTab() === "daily"}>

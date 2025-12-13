@@ -11,7 +11,7 @@ const COST_COL_WIDTH = 12;
 const METRIC_COLUMNS_WIDTH = INPUT_COL_WIDTH + OUTPUT_COL_WIDTH + CACHE_COL_WIDTH + TOTAL_COL_WIDTH + COST_COL_WIDTH;
 const SIDE_PADDING = 2;
 const MIN_NAME_COLUMN = 24;
-const MAX_NAME_COLUMN = 60;
+
 
 interface ModelViewProps {
   data: TUIData;
@@ -38,8 +38,8 @@ export function ModelView(props: ModelViewProps) {
   });
 
   const nameColumnWidths = createMemo(() => {
-    const available = props.width - SIDE_PADDING - METRIC_COLUMNS_WIDTH;
-    const nameColumn = Math.max(MIN_NAME_COLUMN, Math.min(available, MAX_NAME_COLUMN));
+    const available = Math.max(props.width - SIDE_PADDING - METRIC_COLUMNS_WIDTH, MIN_NAME_COLUMN);
+    const nameColumn = Math.max(MIN_NAME_COLUMN, available);
 
     return {
       column: nameColumn,

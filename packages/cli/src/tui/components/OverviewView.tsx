@@ -81,20 +81,20 @@ export function OverviewView(props: OverviewViewProps) {
                   <box flexDirection="row">
                     <Show when={isVeryNarrowTerminal()} fallback={
                       <>
-                        <text dim>{"  In: "}</text><text fg="cyan">{formatTokens(model.inputTokens)}</text>
-                        <text dim>{" · Out: "}</text><text fg="cyan">{formatTokens(model.outputTokens)}</text>
-                        <text dim>{" · CR: "}</text><text fg="cyan">{formatTokens(model.cacheReadTokens)}</text>
-                        <text dim>{" · CW: "}</text><text fg="cyan">{formatTokens(model.cacheWriteTokens)}</text>
+                        <text fg="gray">{"  In: "}</text><text dim>{formatTokens(model.inputTokens)}</text>
+                        <text fg="gray">{" · Out: "}</text><text dim>{formatTokens(model.outputTokens)}</text>
+                        <text fg="gray">{" · CR: "}</text><text dim>{formatTokens(model.cacheReadTokens)}</text>
+                        <text fg="gray">{" · CW: "}</text><text dim>{formatTokens(model.cacheWriteTokens)}</text>
                       </>
                     }>
-                      <text dim>{"  "}</text>
-                      <text fg="cyan">{formatTokensCompact(model.inputTokens)}</text>
-                      <text dim>{"/"}</text>
-                      <text fg="cyan">{formatTokensCompact(model.outputTokens)}</text>
-                      <text dim>{"/"}</text>
-                      <text fg="cyan">{formatTokensCompact(model.cacheReadTokens)}</text>
-                      <text dim>{"/"}</text>
-                      <text fg="cyan">{formatTokensCompact(model.cacheWriteTokens)}</text>
+                      <text fg="gray">{"  "}</text>
+                      <text dim>{formatTokensCompact(model.inputTokens)}</text>
+                      <text fg="gray">{"/"}</text>
+                      <text dim>{formatTokensCompact(model.outputTokens)}</text>
+                      <text fg="gray">{"/"}</text>
+                      <text dim>{formatTokensCompact(model.cacheReadTokens)}</text>
+                      <text fg="gray">{"/"}</text>
+                      <text dim>{formatTokensCompact(model.cacheWriteTokens)}</text>
                     </Show>
                   </box>
                 </box>

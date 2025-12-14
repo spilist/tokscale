@@ -301,6 +301,7 @@ export function App(props: AppProps) {
                   data={data()!}
                   height={contentHeight()}
                   colorPalette={colorPalette()}
+                  width={columns()}
                 />
               </Match>
             </Switch>

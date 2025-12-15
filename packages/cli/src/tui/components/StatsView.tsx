@@ -44,6 +44,8 @@ export function StatsView(props: StatsViewProps) {
   const cellWidth = 2;
   
   const [clickedCell, setClickedCell] = createSignal<string | null>(null);
+  // DEBUG: keep this for debugging mouse click coordinate mapping
+  const [debugInfo, setDebugInfo] = createSignal<string>("No click yet");
   
   const selectedBreakdown = createMemo(() => {
     const date = clickedCell();
@@ -113,22 +115,39 @@ export function StatsView(props: StatsViewProps) {
           <text dim>{monthLabelRow()}</text>
         </box>
 
+        {/* DEBUG: onMouseDown handler for grid click - keep for coordinate debugging */}
         <box onMouseDown={(e: { x: number; y: number }) => {
           const labelW = dayLabelWidth();
           const col = Math.floor((e.x - labelW) / cellWidth);
           const row = e.y - 2;
           const gridRows = grid().length;
           
-          if (row < 0 || row >= gridRows || col < 0) return;
+          setDebugInfo(`y=${e.y} row=${row} (y-2) col=${col}`);
+          
+          if (row < 0 || row >= gridRows) {
+            setDebugInfo(`y=${e.y} row=${row} OUT_OF_BOUNDS (0-6)`);
+            return;
+          }
+          if (col < 0) {
+            setDebugInfo(`x=${e.x} col=${col} OUT_OF_BOUNDS (label area)`);
+            return;
+          }
           
           const rowData = grid()[row];
-          if (!rowData || col >= rowData.length) return;
+          if (!rowData || col >= rowData.length) {
+            setDebugInfo(`y=${e.y} row=${row} col=${col} NO_CELL`);
+            return;
+          }
           
           const cell = rowData[col];
-          if (!cell?.date) return;
+          if (!cell?.date) {
+            setDebugInfo(`y=${e.y} row=${row} col=${col} EMPTY_CELL`);
+            return;
+          }
           
           const newDate = clickedCell() === cell.date ? null : cell.date;
           setClickedCell(newDate);
+          setDebugInfo(`y=${e.y} row=${row} col=${col} → ${newDate || 'deselected'}`);
         }}>
           <For each={DAYS}>
             {(day, dayIndex) => (
@@ -148,7 +167,12 @@ export function StatsView(props: StatsViewProps) {
         </box>
       </box>
 
+      {/* DEBUG: display click coordinates - keep for debugging */}
       <box flexDirection="row" gap={2}>
+        <text fg="yellow">{`DEBUG: ${debugInfo()} | selected: ${clickedCell() || 'none'}`}</text>
+      </box>
+
+      <box flexDirection="row" gap={2} marginTop={1}>
         <text dim>Less</text>
         <box flexDirection="row" gap={0}>
           <For each={[0, 1, 2, 3, 4]}>

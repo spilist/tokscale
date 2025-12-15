@@ -21,6 +21,7 @@ import {
   generateMonthlyReport as generateMonthlyReportTS,
   generateGraphData as generateGraphDataTS,
 } from "./sessions/reports.js";
+import { readCursorMessagesFromCache } from "./cursor.js";
 
 // =============================================================================
 // Types matching Rust exports
@@ -591,29 +592,44 @@ export async function parseLocalSourcesAsync(options: LocalParseOptions): Promis
   return runInSubprocess<ParsedMessages>("parseLocalSources", [nativeOptions]);
 }
 
+function buildMessagesForFallback(options: FinalizeOptions): UnifiedMessage[] {
+  const messages: UnifiedMessage[] = options.localMessages.messages.map((msg) => ({
+    source: msg.source,
+    modelId: msg.modelId,
+    providerId: msg.providerId,
+    sessionId: msg.sessionId,
+    timestamp: msg.timestamp,
+    date: msg.date,
+    tokens: {
+      input: msg.input,
+      output: msg.output,
+      cacheRead: msg.cacheRead,
+      cacheWrite: msg.cacheWrite,
+      reasoning: msg.reasoning,
+    },
+    cost: 0,
+  }));
+
+  if (options.includeCursor) {
+    const cursorMessages = readCursorMessagesFromCache();
+    for (const cursor of cursorMessages) {
+      const inRange =
+        (!options.year || cursor.date.startsWith(options.year)) &&
+        (!options.since || cursor.date >= options.since) &&
+        (!options.until || cursor.date <= options.until);
+      if (inRange) {
+        messages.push(cursor);
+      }
+    }
+  }
+
+  return messages;
+}
+
 export async function finalizeReportAsync(options: FinalizeOptions): Promise<ModelReport> {
-  // Use TypeScript fallback when native module is not available
   if (!isNativeAvailable()) {
     const startTime = performance.now();
-
-    // Convert parsed messages to UnifiedMessage format
-    const messages: UnifiedMessage[] = options.localMessages.messages.map((msg) => ({
-      source: msg.source,
-      modelId: msg.modelId,
-      providerId: msg.providerId,
-      sessionId: msg.sessionId,
-      timestamp: msg.timestamp,
-      date: msg.date,
-      tokens: {
-        input: msg.input,
-        output: msg.output,
-        cacheRead: msg.cacheRead,
-        cacheWrite: msg.cacheWrite,
-        reasoning: msg.reasoning,
-      },
-      cost: 0,
-    }));
-
+    const messages = buildMessagesForFallback(options);
     return generateModelReportTS(messages, options.pricing, startTime);
   }
 
@@ -631,28 +647,9 @@ export async function finalizeReportAsync(options: FinalizeOptions): Promise<Mod
 }
 
 export async function finalizeMonthlyReportAsync(options: FinalizeOptions): Promise<MonthlyReport> {
-  // Use TypeScript fallback when native module is not available
   if (!isNativeAvailable()) {
     const startTime = performance.now();
-
-    // Convert parsed messages to UnifiedMessage format
-    const messages: UnifiedMessage[] = options.localMessages.messages.map((msg) => ({
-      source: msg.source,
-      modelId: msg.modelId,
-      providerId: msg.providerId,
-      sessionId: msg.sessionId,
-      timestamp: msg.timestamp,
-      date: msg.date,
-      tokens: {
-        input: msg.input,
-        output: msg.output,
-        cacheRead: msg.cacheRead,
-        cacheWrite: msg.cacheWrite,
-        reasoning: msg.reasoning,
-      },
-      cost: 0,
-    }));
-
+    const messages = buildMessagesForFallback(options);
     return generateMonthlyReportTS(messages, options.pricing, startTime);
   }
 
@@ -670,28 +667,9 @@ export async function finalizeMonthlyReportAsync(options: FinalizeOptions): Prom
 }
 
 export async function finalizeGraphAsync(options: FinalizeOptions): Promise<TokenContributionData> {
-  // Use TypeScript fallback when native module is not available
   if (!isNativeAvailable()) {
     const startTime = performance.now();
-
-    // Convert parsed messages to UnifiedMessage format
-    const messages: UnifiedMessage[] = options.localMessages.messages.map((msg) => ({
-      source: msg.source,
-      modelId: msg.modelId,
-      providerId: msg.providerId,
-      sessionId: msg.sessionId,
-      timestamp: msg.timestamp,
-      date: msg.date,
-      tokens: {
-        input: msg.input,
-        output: msg.output,
-        cacheRead: msg.cacheRead,
-        cacheWrite: msg.cacheWrite,
-        reasoning: msg.reasoning,
-      },
-      cost: 0,
-    }));
-
+    const messages = buildMessagesForFallback(options);
     return generateGraphDataTS(messages, options.pricing, startTime);
   }
 

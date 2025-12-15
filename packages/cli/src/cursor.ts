@@ -504,3 +504,55 @@ export function getCursorCacheStatus(): { exists: boolean; lastModified?: Date; 
 
   return { exists, lastModified, path: CURSOR_CACHE_FILE };
 }
+
+export interface CursorUnifiedMessage {
+  source: "cursor";
+  modelId: string;
+  providerId: string;
+  sessionId: string;
+  timestamp: number;
+  date: string;
+  tokens: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    reasoning: number;
+  };
+  cost: number;
+}
+
+export function readCursorMessagesFromCache(): CursorUnifiedMessage[] {
+  if (!fs.existsSync(CURSOR_CACHE_FILE)) {
+    return [];
+  }
+
+  try {
+    const csvText = fs.readFileSync(CURSOR_CACHE_FILE, "utf-8");
+    const rows = parseCursorCsv(csvText);
+
+    return rows.map((row) => {
+      const cacheWrite = Math.max(0, row.inputWithCacheWrite - row.inputWithoutCacheWrite);
+      const input = row.inputWithoutCacheWrite;
+
+      return {
+        source: "cursor" as const,
+        modelId: row.model,
+        providerId: inferProvider(row.model),
+        sessionId: `cursor-${row.date}-${row.model}`,
+        timestamp: row.timestamp,
+        date: row.date,
+        tokens: {
+          input,
+          output: row.outputTokens,
+          cacheRead: row.cacheRead,
+          cacheWrite,
+          reasoning: 0,
+        },
+        cost: row.costToYou || row.apiCost,
+      };
+    });
+  } catch {
+    return [];
+  }
+}

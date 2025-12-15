@@ -392,11 +392,10 @@ function getEnabledSources(options: FilterOptions): SourceType[] | undefined {
   return sources;
 }
 
-async function ensureNativeModule(): Promise<void> {
+function logNativeStatus(): void {
   if (!isNativeAvailable()) {
-    console.error(pc.red("Error: Native Rust module not available."));
-    console.error(pc.gray("Run 'yarn build:core' to build the native module."));
-    process.exit(1);
+    console.log(pc.yellow("  Note: Using TypeScript fallback (native module not available)"));
+    console.log(pc.gray("  Run 'bun run build:core' for ~10x faster processing.\n"));
   }
 }
 
@@ -478,7 +477,7 @@ async function loadDataSourcesParallel(
 }
 
 async function showModelReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }) {
-  await ensureNativeModule();
+  logNativeStatus();
 
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
@@ -614,7 +613,7 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
 }
 
 async function showMonthlyReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }) {
-  await ensureNativeModule();
+  logNativeStatus();
 
   const dateRange = getDateRangeLabel(options);
   const title = dateRange 
@@ -722,7 +721,7 @@ async function outputJsonReport(
   reportType: JsonReportType,
   options: FilterOptions & DateFilterOptions
 ) {
-  await ensureNativeModule();
+  logNativeStatus();
 
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
@@ -772,7 +771,7 @@ interface GraphCommandOptions extends FilterOptions, DateFilterOptions {
 }
 
 async function handleGraphCommand(options: GraphCommandOptions) {
-  await ensureNativeModule();
+  logNativeStatus();
 
   // Start spinner for loading phase (only if outputting to file, not stdout)
   const spinner = options.output ? createSpinner({ color: "cyan" }) : null;

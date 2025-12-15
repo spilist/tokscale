@@ -8,7 +8,6 @@ const CACHE_DIR = join(homedir(), ".cache", "tokscale");
 const CONFIG_FILE = join(CONFIG_DIR, "tui-settings.json");
 const CACHE_FILE = join(CACHE_DIR, "tui-data-cache.json");
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_STALE_THRESHOLD_MS = 60 * 1000;
 
 interface TUISettings {
@@ -60,12 +59,6 @@ export function loadCachedData(enabledSources: Set<string>): TUIData | null {
     }
     
     const cached: CachedTUIData = JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
-    const cacheAge = Date.now() - cached.timestamp;
-    
-    const isTooOld = cacheAge > CACHE_TTL_MS;
-    if (isTooOld) {
-      return null;
-    }
     
     if (!sourcesMatch(enabledSources, cached.enabledSources)) {
       return null;
@@ -121,5 +114,17 @@ export function isCacheStale(enabledSources: Set<string>): boolean {
     return cacheAge > CACHE_STALE_THRESHOLD_MS;
   } catch {
     return true;
+  }
+}
+
+export function getCacheTimestamp(): number | null {
+  try {
+    if (!existsSync(CACHE_FILE)) {
+      return null;
+    }
+    const cached: CachedTUIData = JSON.parse(readFileSync(CACHE_FILE, "utf-8"));
+    return cached.timestamp;
+  } catch {
+    return null;
   }
 }

@@ -11,7 +11,7 @@ import { LoadingSpinner } from "./components/LoadingSpinner.js";
 import { useData, type DateFilters } from "./hooks/useData.js";
 import type { ColorPaletteName } from "./config/themes.js";
 import { DEFAULT_PALETTE, getPaletteNames } from "./config/themes.js";
-import { loadSettings, saveSettings } from "./config/settings.js";
+import { loadSettings, saveSettings, getCacheTimestamp } from "./config/settings.js";
 import { TABS, ALL_SOURCES, type TUIOptions, type TabType, type SortType, type SourceType } from "./types/index.js";
 
 export type AppProps = TUIOptions;
@@ -54,6 +54,8 @@ export function App(props: AppProps) {
   };
 
   const { data, loading, error, refresh, loadingPhase, isRefreshing } = useData(() => enabledSources(), dateFilters);
+  
+  const cacheTimestamp = () => !isRefreshing() && !loading() ? getCacheTimestamp() : null;
   
   const [selectedDate, setSelectedDate] = createSignal<string | null>(null);
 
@@ -326,6 +328,7 @@ export function App(props: AppProps) {
         statusMessage={statusMessage()}
         isRefreshing={isRefreshing()}
         loadingPhase={loadingPhase()}
+        cacheTimestamp={cacheTimestamp()}
         width={columns()}
         onSourceToggle={handleSourceToggle}
         onSortChange={handleSortChange}

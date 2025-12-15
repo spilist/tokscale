@@ -48,10 +48,11 @@ export function StatsView(props: StatsViewProps) {
   const [debugInfo, setDebugInfo] = createSignal<string>("No click yet");
   
   const selectedBreakdown = createMemo(() => {
-    if (!props.selectedDate) return null;
+    const date = clickedCell();
+    if (!date) return null;
     if (!props.data.dailyBreakdowns) return null;
     if (!(props.data.dailyBreakdowns instanceof Map)) return null;
-    return props.data.dailyBreakdowns.get(props.selectedDate) || null;
+    return props.data.dailyBreakdowns.get(date) || null;
   });
   
   const monthPositions = createMemo(() => {
@@ -144,8 +145,9 @@ export function StatsView(props: StatsViewProps) {
             return;
           }
           
-          setClickedCell(cell.date);
-          setDebugInfo(`y=${e.y} row=${row} col=${col} → ${cell.date}`);
+          const newDate = clickedCell() === cell.date ? null : cell.date;
+          setClickedCell(newDate);
+          setDebugInfo(`y=${e.y} row=${row} col=${col} → ${newDate || 'deselected'}`);
         }}>
           <For each={DAYS}>
             {(day, dayIndex) => (

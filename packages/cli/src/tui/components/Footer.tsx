@@ -1,4 +1,4 @@
-import { Show, createSignal, onMount, onCleanup } from "solid-js";
+import { Show, createSignal, createMemo, onMount, onCleanup } from "solid-js";
 import type { SourceType, SortType, TabType, LoadingPhase } from "../types/index.js";
 import type { ColorPaletteName } from "../config/themes.js";
 import type { TotalBreakdown } from "../hooks/useData.js";
@@ -19,11 +19,23 @@ interface FooterProps {
   statusMessage?: string | null;
   isRefreshing?: boolean;
   loadingPhase?: LoadingPhase;
+  cacheTimestamp?: number | null;
   width?: number;
   onSourceToggle?: (source: SourceType) => void;
   onSortChange?: (sort: SortType) => void;
   onPaletteChange?: () => void;
   onRefresh?: () => void;
+}
+
+function formatTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 export function Footer(props: FooterProps) {
@@ -103,6 +115,11 @@ export function Footer(props: FooterProps) {
       </box>
       <Show when={props.isRefreshing}>
         <LoadingStatusLine phase={props.loadingPhase} />
+      </Show>
+      <Show when={!props.isRefreshing && props.cacheTimestamp}>
+        <box flexDirection="row">
+          <text dim>{`Last updated: ${formatTimeAgo(props.cacheTimestamp!)}`}</text>
+        </box>
       </Show>
     </box>
   );

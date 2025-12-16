@@ -261,11 +261,70 @@ interface DateBreakdownPanelProps {
 }
 
 function DateBreakdownPanel(props: DateBreakdownPanelProps) {
+  const groupedBySource = createMemo(() => {
+    if (!props.breakdown?.models) return new Map();
+    const groups = new Map<string, typeof props.breakdown.models>();
+    for (const model of props.breakdown.models) {
+      const existing = groups.get(model.source) || [];
+      existing.push(model);
+      groups.set(model.source, existing);
+    }
+    return groups;
+  });
+
   return (
-    <box flexDirection="column" marginTop={1}>
-      <text bold fg="white">{`Selected: ${props.breakdown.date}`}</text>
-      <text fg="green">{formatCost(props.breakdown.cost)}</text>
-      <text dim>{`Models: ${props.breakdown.models?.length || 0}`}</text>
+    <box flexDirection="column" marginTop={1} paddingX={1}>
+      <box flexDirection="row" justifyContent="space-between">
+        <text bold fg="white">{formatDateDisplay(props.breakdown.date)}</text>
+        <box flexDirection="row" gap={2}>
+          <text fg="cyan">{formatTokens(props.breakdown.totalTokens)}</text>
+          <text fg="green" bold>{formatCost(props.breakdown.cost)}</text>
+        </box>
+      </box>
+      
+      <box flexDirection="column" marginTop={1}>
+        <For each={Array.from(groupedBySource().entries())}>
+          {([source, models]) => (
+            <box flexDirection="column">
+              <box flexDirection="row" gap={1}>
+                <text fg={SOURCE_COLORS[source] || "#888888"} bold>{`● ${source.toUpperCase()}`}</text>
+                <text dim>{`(${models.length} model${models.length > 1 ? "s" : ""})`}</text>
+              </box>
+              <For each={models}>
+                {(model) => (
+                  <box flexDirection={props.isNarrow ? "column" : "row"} marginLeft={2} gap={props.isNarrow ? 0 : 2}>
+                    <box flexDirection="row" gap={1}>
+                      <text fg={getModelColor(model.modelId)}>{model.modelId}</text>
+                      <text fg="green">{formatCost(model.cost)}</text>
+                    </box>
+                    <box flexDirection="row" gap={1}>
+                      <Show when={model.tokens.input > 0}>
+                        <text dim>In:</text>
+                        <text fg="cyan">{formatTokens(model.tokens.input)}</text>
+                      </Show>
+                      <Show when={model.tokens.output > 0}>
+                        <text dim>Out:</text>
+                        <text fg="cyan">{formatTokens(model.tokens.output)}</text>
+                      </Show>
+                      <Show when={model.tokens.cacheRead > 0}>
+                        <text dim>Cache:</text>
+                        <text fg="cyan">{formatTokens(model.tokens.cacheRead)}</text>
+                      </Show>
+                    </box>
+                  </box>
+                )}
+              </For>
+            </box>
+          )}
+        </For>
+      </box>
+      
+      <box flexDirection="row" marginTop={1} gap={2}>
+        <text dim>Total:</text>
+        <text fg="cyan">{formatTokens(props.breakdown.totalTokens)} tokens</text>
+        <text dim>|</text>
+        <text dim>Click another day or same day to close</text>
+      </box>
     </box>
   );
 }

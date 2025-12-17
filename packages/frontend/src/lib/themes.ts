@@ -18,7 +18,7 @@ export type ColorPaletteName =
   | "monochrome"
   | "YlGnBu";
 
-const GRAPH_EMPTY = "#1F1F20";
+const GRAPH_EMPTY = "var(--color-graph-empty)";
 
 export const colorPalettes: Record<ColorPaletteName, GraphColorPalette> = {
   green: {
@@ -114,9 +114,9 @@ export type Theme = GraphColorPalette & { background: string; text: string; meta
 export const DEFAULT_THEME = DEFAULT_PALETTE;
 export const getThemeNames = getPaletteNames;
 
-const CANVAS_DEFAULT = "#141415";
-const FG_DEFAULT = "#FFFFFF";
-const FG_MUTED = "#696969";
+const CANVAS_DEFAULT = "var(--color-canvas-default)";
+const FG_DEFAULT = "var(--color-fg-default)";
+const FG_MUTED = "var(--color-fg-muted)";
 
 export const getTheme = (name: ThemeName): Theme => ({
   ...getPalette(name),

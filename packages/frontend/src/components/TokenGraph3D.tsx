@@ -3,6 +3,7 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import type { DailyContribution, GraphColorPalette, TooltipPosition } from "@/lib/types";
 import { getGradeColor } from "@/lib/themes";
+import { useSystemDarkMode } from "@/lib/useMediaQuery";
 import { groupByWeek, hexToNumber, formatCurrency, formatDate, formatTokenCount } from "@/lib/utils";
 import { CUBE_SIZE, MAX_CUBE_HEIGHT, MIN_CUBE_HEIGHT, ISO_CANVAS_WIDTH, ISO_CANVAS_HEIGHT } from "@/lib/constants";
 
@@ -42,6 +43,7 @@ export function TokenGraph3D({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const obeliskRef = useRef<any>(null);
   const weeksData = groupByWeek(contributions, year);
+  const isDark = useSystemDarkMode();
 
   useEffect(() => {
     async function loadObelisk() {
@@ -72,7 +74,7 @@ export function TokenGraph3D({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.fillStyle = "#141415";
+    ctx.fillStyle = isDark ? "#141415" : "#FFFFFF";
     ctx.fillRect(0, 0, ISO_CANVAS_WIDTH, ISO_CANVAS_HEIGHT);
 
     const point = new obelisk.Point(130, 90);
@@ -99,7 +101,9 @@ export function TokenGraph3D({
 
         const intensity = day?.intensity ?? 0;
         const colorHex = getGradeColor(palette, intensity);
-        const resolvedColor = colorHex.startsWith("var(") ? "#1F1F20" : colorHex;
+        const resolvedColor = colorHex.startsWith("var(") 
+          ? (isDark ? "#1F1F20" : "#EBEDF0") 
+          : colorHex;
         const colorNum = hexToNumber(resolvedColor);
 
         const dimension = new obelisk.CubeDimension(CUBE_SIZE, CUBE_SIZE, Math.max(cubeHeight, MIN_CUBE_HEIGHT));
@@ -159,9 +163,9 @@ export function TokenGraph3D({
     return (
       <div
         className="flex items-center justify-center"
-        style={{ width: ISO_CANVAS_WIDTH, height: ISO_CANVAS_HEIGHT, backgroundColor: "#141415" }}
+        style={{ width: ISO_CANVAS_WIDTH, height: ISO_CANVAS_HEIGHT, backgroundColor: isDark ? "#141415" : "#FFFFFF" }}
       >
-        <div className="animate-pulse" style={{ color: "#696969" }}>Loading 3D view...</div>
+        <div className="animate-pulse" style={{ color: isDark ? "#696969" : "#656D76" }}>Loading 3D view...</div>
       </div>
     );
   }
@@ -178,47 +182,47 @@ export function TokenGraph3D({
       />
 
       <div className="absolute top-3 right-5">
-        <h5 className="mb-1 text-sm font-semibold" style={{ color: "#FFFFFF" }}>Token Usage</h5>
+        <h5 className="mb-1 text-sm font-semibold" style={{ color: isDark ? "#FFFFFF" : "#1F2328" }}>Token Usage</h5>
         <div
           className="flex justify-between rounded-md border px-1 md:px-2"
-          style={{ borderColor: "#262627", backgroundColor: "#1F1F20" }}
+          style={{ borderColor: isDark ? "#262627" : "#D0D7DE", backgroundColor: isDark ? "#1F1F20" : "#FFFFFF" }}
         >
           <div className="p-2">
             <span className="block text-2xl font-bold leading-tight" style={{ color: palette.grade4 }}>{formatCurrency(totalCost)}</span>
-            <span className="block text-xs font-bold" style={{ color: "#FFFFFF" }}>Total</span>
-            <span className="hidden sm:block text-xs" style={{ color: "#696969" }}>{dateRange.start} → {dateRange.end}</span>
+            <span className="block text-xs font-bold" style={{ color: isDark ? "#FFFFFF" : "#1F2328" }}>Total</span>
+            <span className="hidden sm:block text-xs" style={{ color: isDark ? "#696969" : "#656D76" }}>{dateRange.start} → {dateRange.end}</span>
           </div>
           <div className="p-2 hidden xl:block">
             <span className="block text-2xl font-bold leading-tight" style={{ color: palette.grade4 }}>{formatTokenCount(totalTokens)}</span>
-            <span className="block text-xs font-bold" style={{ color: "#FFFFFF" }}>Tokens</span>
-            <span className="hidden sm:block text-xs" style={{ color: "#696969" }}>{activeDays} active days</span>
+            <span className="block text-xs font-bold" style={{ color: isDark ? "#FFFFFF" : "#1F2328" }}>Tokens</span>
+            <span className="hidden sm:block text-xs" style={{ color: isDark ? "#696969" : "#656D76" }}>{activeDays} active days</span>
           </div>
           {bestDay && (
             <div className="p-2">
               <span className="block text-2xl font-bold leading-tight" style={{ color: palette.grade4 }}>{formatCurrency(bestDay.totals.cost)}</span>
-              <span className="block text-xs font-bold" style={{ color: "#FFFFFF" }}>Best day</span>
-              <span className="hidden sm:block text-xs" style={{ color: "#696969" }}>{formatDate(bestDay.date).split(",")[0]}</span>
+              <span className="block text-xs font-bold" style={{ color: isDark ? "#FFFFFF" : "#1F2328" }}>Best day</span>
+              <span className="hidden sm:block text-xs" style={{ color: isDark ? "#696969" : "#656D76" }}>{formatDate(bestDay.date).split(",")[0]}</span>
             </div>
           )}
         </div>
-        <p className="mt-1 text-right text-xs" style={{ color: "#696969" }}>
+        <p className="mt-1 text-right text-xs" style={{ color: isDark ? "#696969" : "#656D76" }}>
           Average: <span className="font-bold" style={{ color: palette.grade4 }}>{formatCurrency(activeDays > 0 ? totalCost / activeDays : 0)}</span> / day
         </p>
       </div>
 
       <div className="absolute bottom-6 left-5">
-        <h5 className="mb-1 text-sm font-semibold" style={{ color: "#FFFFFF" }}>Streaks</h5>
+        <h5 className="mb-1 text-sm font-semibold" style={{ color: isDark ? "#FFFFFF" : "#1F2328" }}>Streaks</h5>
         <div
           className="flex justify-between rounded-md border px-1 md:px-2"
-          style={{ borderColor: "#262627", backgroundColor: "#1F1F20" }}
+          style={{ borderColor: isDark ? "#262627" : "#D0D7DE", backgroundColor: isDark ? "#1F1F20" : "#FFFFFF" }}
         >
           <div className="p-2">
             <span className="block text-2xl font-bold leading-tight" style={{ color: palette.grade4 }}>{longestStreak} <span className="text-base">days</span></span>
-            <span className="block text-xs font-bold" style={{ color: "#FFFFFF" }}>Longest</span>
+            <span className="block text-xs font-bold" style={{ color: isDark ? "#FFFFFF" : "#1F2328" }}>Longest</span>
           </div>
           <div className="p-2">
             <span className="block text-2xl font-bold leading-tight" style={{ color: palette.grade4 }}>{currentStreak} <span className="text-base">days</span></span>
-            <span className="block text-xs font-bold" style={{ color: "#FFFFFF" }}>Current</span>
+            <span className="block text-xs font-bold" style={{ color: isDark ? "#FFFFFF" : "#1F2328" }}>Current</span>
           </div>
         </div>
       </div>

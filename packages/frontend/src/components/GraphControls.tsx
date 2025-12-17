@@ -45,25 +45,29 @@ export function GraphControls({
 
   return (
     <div className="relative mb-4">
-      <div className="float-right mt-1 ml-4 relative top-0 flex">
+      <div role="group" aria-label="View mode" className="float-right mt-1 ml-4 relative top-0 flex">
         <button
           onClick={() => onViewChange("2d")}
-          className="px-3 py-1.5 text-xs font-semibold rounded-l-full border transition-all duration-200"
+          aria-pressed={view === "2d"}
+          aria-label="2D view"
+          className="px-3 py-1.5 text-xs font-semibold rounded-l-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           style={{
-            backgroundColor: view === "2d" ? palette.grade3 : "#212124",
-            color: view === "2d" ? "#fff" : "#FFFFFF",
-            borderColor: view === "2d" ? palette.grade3 : "#262627",
+            backgroundColor: view === "2d" ? palette.grade3 : "var(--color-bg-button)",
+            color: view === "2d" ? "#fff" : "var(--color-fg-default)",
+            borderColor: view === "2d" ? palette.grade3 : "var(--color-border-default)",
           }}
         >
           2D
         </button>
         <button
           onClick={() => onViewChange("3d")}
-          className="px-3 py-1.5 text-xs font-semibold rounded-r-full border-t border-b border-r transition-all duration-200"
+          aria-pressed={view === "3d"}
+          aria-label="3D view"
+          className="px-3 py-1.5 text-xs font-semibold rounded-r-full border-t border-b border-r transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           style={{
-            backgroundColor: view === "3d" ? palette.grade3 : "#212124",
-            color: view === "3d" ? "#fff" : "#FFFFFF",
-            borderColor: view === "3d" ? palette.grade3 : "#262627",
+            backgroundColor: view === "3d" ? palette.grade3 : "var(--color-bg-button)",
+            color: view === "3d" ? "#fff" : "var(--color-fg-default)",
+            borderColor: view === "3d" ? palette.grade3 : "var(--color-border-default)",
           }}
         >
           3D
@@ -74,11 +78,12 @@ export function GraphControls({
         <select
           value={paletteName}
           onChange={(e) => onPaletteChange(e.target.value as ColorPaletteName)}
-          className="text-xs py-1.5 px-2 rounded-lg border cursor-pointer font-medium transition-all duration-200 hover:border-neutral-400"
+          aria-label="Color palette"
+          className="text-xs py-1.5 px-2 rounded-lg border cursor-pointer font-medium transition-all duration-200 hover:border-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           style={{
-            borderColor: "#262627",
-            color: "#FFFFFF",
-            backgroundColor: "#212124",
+            borderColor: "var(--color-border-default)",
+            color: "var(--color-fg-default)",
+            backgroundColor: "var(--color-bg-button)",
           }}
         >
           {paletteNames.map((name) => (
@@ -87,7 +92,7 @@ export function GraphControls({
         </select>
       </div>
 
-      <h2 className="text-lg font-medium mb-3" style={{ color: "#FFFFFF" }}>
+      <h2 className="text-lg font-medium mb-3" style={{ color: "var(--color-fg-default)" }}>
         <span className="font-bold" style={{ color: palette.grade4 }}>{totalContributions.toLocaleString()}</span>
         {" "}token usage entries
         {selectedYear && (
@@ -97,11 +102,12 @@ export function GraphControls({
               <select
                 value={selectedYear}
                 onChange={(e) => onYearChange(e.target.value)}
-                className="font-bold border-none cursor-pointer underline decoration-dotted decoration-2 underline-offset-4"
-                style={{ color: "#FFFFFF", backgroundColor: "transparent" }}
+                aria-label="Select year"
+                className="font-bold border-none cursor-pointer underline decoration-dotted decoration-2 underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                style={{ color: "var(--color-fg-default)", backgroundColor: "transparent" }}
               >
                 {availableYears.map((year) => (
-                  <option key={year} value={year} style={{ backgroundColor: "#141415" }}>{year}</option>
+                  <option key={year} value={year} style={{ backgroundColor: "var(--color-canvas-default)" }}>{year}</option>
                 ))}
               </select>
             ) : (
@@ -115,19 +121,21 @@ export function GraphControls({
 
       <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
         {availableSources.length > 1 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold" style={{ color: "#696969" }}>Filter:</span>
+          <div role="group" aria-label="Source filters" className="flex items-center gap-2 flex-wrap">
+            <span id="source-filter-label" className="text-xs font-semibold" style={{ color: "var(--color-fg-muted)" }}>Filter:</span>
             {availableSources.map((source) => {
               const isSelected = sourceFilter.length === 0 || sourceFilter.includes(source);
               return (
                 <button
                   key={source}
                   onClick={() => handleSourceToggle(source)}
-                  className={`px-3 py-1 text-xs rounded-full transition-all duration-200 hover:scale-105 ${isSelected ? "font-semibold" : "opacity-50"}`}
+                  aria-pressed={isSelected}
+                  aria-label={`Filter by ${SOURCE_DISPLAY_NAMES[source] || source}`}
+                  className={`px-3 py-1 text-xs rounded-full transition-all duration-200 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${isSelected ? "font-semibold" : "opacity-50"}`}
                   style={{
                     backgroundColor: isSelected ? `${palette.grade3}30` : "transparent",
-                    color: "#FFFFFF",
-                    border: `1.5px solid ${isSelected ? palette.grade3 : "#262627"}`,
+                    color: "var(--color-fg-default)",
+                    border: `1.5px solid ${isSelected ? palette.grade3 : "var(--color-border-default)"}`,
                   }}
                 >
                   {SOURCE_DISPLAY_NAMES[source] || source}
@@ -137,8 +145,9 @@ export function GraphControls({
             {sourceFilter.length > 0 && sourceFilter.length < availableSources.length && (
               <button
                 onClick={() => onSourceFilterChange([...availableSources])}
-                className="px-3 py-1 text-xs font-medium rounded-full hover:bg-white/10 transition-colors"
-                style={{ color: "#696969" }}
+                aria-label="Show all sources"
+                className="px-3 py-1 text-xs font-medium rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                style={{ color: "var(--color-fg-muted)" }}
               >
                 Show all
               </button>
@@ -146,8 +155,9 @@ export function GraphControls({
             {sourceFilter.length === availableSources.length && (
               <button
                 onClick={() => onSourceFilterChange([])}
-                className="px-3 py-1 text-xs font-medium rounded-full hover:bg-white/10 transition-colors"
-                style={{ color: "#696969" }}
+                aria-label="Clear all source filters"
+                className="px-3 py-1 text-xs font-medium rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                style={{ color: "var(--color-fg-muted)" }}
               >
                 Clear
               </button>
@@ -156,7 +166,7 @@ export function GraphControls({
         )}
 
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs font-medium" style={{ color: "#696969" }}>Less</span>
+          <span className="text-xs font-medium" style={{ color: "var(--color-fg-muted)" }}>Less</span>
           {[0, 1, 2, 3, 4].map((level) => (
             <div
               key={level}
@@ -164,7 +174,7 @@ export function GraphControls({
               style={{ backgroundColor: palette[`grade${level}` as keyof GraphColorPalette] as string }}
             />
           ))}
-          <span className="text-xs font-medium" style={{ color: "#696969" }}>More</span>
+          <span className="text-xs font-medium" style={{ color: "var(--color-fg-muted)" }}>More</span>
         </div>
       </div>
     </div>

@@ -57,8 +57,8 @@
 }
 
 body {
-  background: #141415;
-  color: #FFFFFF;
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-figtree), system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
@@ -78,10 +78,10 @@ a:hover {
   text-decoration: none;
 }
 
-.bg-canvas { background-color: #141415; }
-.bg-canvas-subtle { background-color: #1F1F20; }
-.bg-card { background-color: #1F1F20; }
-.text-fg { color: #FFFFFF; }
-.text-fg-muted { color: #696969; }
-.border-default { border-color: #262627; }
-.border-subtle { border-color: rgba(255, 255, 255, 0.1); }
+.bg-canvas { background-color: var(--color-canvas-default); }
+.bg-canvas-subtle { background-color: var(--color-canvas-subtle); }
+.bg-card { background-color: var(--color-card-bg); }
+.text-fg { color: var(--color-fg-default); }
+.text-fg-muted { color: var(--color-fg-muted); }
+.border-default { border-color: var(--color-border-default); }
+.border-subtle { border-color: var(--color-border-subtle); }

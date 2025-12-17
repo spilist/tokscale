@@ -16,6 +16,7 @@
     "@emotion/styled": "^11.14.1",
     "@junhoyeo/blackhole": "^1.0.1",
     "@neondatabase/serverless": "^0.10.4",
+    "@primer/octicons-react": "^19.21.1",
     "@primer/primitives": "^11.3.1",
     "@primer/react": "^38.3.0",
     "date-fns": "^4.1.0",

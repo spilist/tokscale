@@ -86,7 +86,7 @@ export function GraphContainer({ data }: GraphContainerProps) {
     <div className="space-y-6">
       <div
         className="rounded-2xl border py-4 overflow-hidden shadow-sm transition-shadow hover:shadow-md"
-        style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+        style={{ backgroundColor: "var(--color-graph-canvas)", borderColor: "var(--color-border-default)" }}
       >
         <div className="px-5">
           <GraphControls

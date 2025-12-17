@@ -35,16 +35,16 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
   return (
     <div
       className="flex flex-col gap-2 rounded-2xl border p-4 pb-[18px]"
-      style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+      style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
     >
       <div className="flex flex-col lg:flex-row gap-6 lg:gap-10">
         <div
           className="flex flex-row items-center gap-[19px] rounded-[20px] py-3 pl-3 pr-8 flex-1"
-          style={{ backgroundColor: "#111113" }}
+          style={{ backgroundColor: "var(--color-bg-darkest)" }}
         >
           <div
             className="relative w-[100px] h-[100px] rounded-[7px] overflow-hidden border-2 flex-shrink-0"
-            style={{ borderColor: "#262627" }}
+            style={{ borderColor: "var(--color-border-default)" }}
           >
             <Image
               src={avatarUrl}
@@ -59,13 +59,13 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center"
                 style={{
-                  background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-                  border: "1px solid #262627",
+                  background: "linear-gradient(135deg, var(--color-bg-darkest) 0%, color-mix(in srgb, var(--color-accent-blue) 20%, var(--color-bg-darkest)) 50%, color-mix(in srgb, var(--color-accent-blue) 35%, var(--color-bg-darkest)) 100%)",
+                  border: "1px solid var(--color-border-default)",
                 }}
               >
                 <span
                   className="text-base font-medium"
-                  style={{ color: "#85CAFF" }}
+                  style={{ color: "var(--color-accent-blue)" }}
                 >
                   #{user.rank}
                 </span>
@@ -75,13 +75,13 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
             <div className="flex flex-col gap-[6px] flex-1 justify-end min-w-0">
               <h1
                 className="text-2xl font-bold truncate leading-[1.2]"
-                style={{ color: "#FFFFFF" }}
+                style={{ color: "var(--color-fg-default)" }}
               >
                 {user.displayName || user.username}
               </h1>
               <p
                 className="text-sm font-bold leading-none"
-                style={{ color: "#696969" }}
+                style={{ color: "var(--color-fg-muted)" }}
               >
                 @{user.username}
               </p>
@@ -93,7 +93,7 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
           <div className="flex flex-col gap-[15px] flex-1 min-w-[120px]">
             <span
               className="text-base font-semibold leading-none"
-              style={{ color: "#85CAFF" }}
+              style={{ color: "var(--color-accent-blue)" }}
             >
               Total Usage Cost
             </span>
@@ -113,13 +113,13 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
           <div className="flex flex-col gap-[15px] flex-1 min-w-[120px]">
             <span
               className="text-base font-semibold leading-none"
-              style={{ color: "#FFFFFF" }}
+              style={{ color: "var(--color-fg-default)" }}
             >
               Total Tokens
             </span>
             <span
               className="text-[27px] font-bold leading-none"
-              style={{ color: "#FFFFFF" }}
+              style={{ color: "var(--color-fg-default)" }}
             >
               {formatNumber(stats.totalTokens)}
             </span>
@@ -127,13 +127,13 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
         </div>
       </div>
 
-      <div className="w-full h-px" style={{ backgroundColor: "#262627" }} />
+      <div className="w-full h-px" style={{ backgroundColor: "var(--color-border-default)" }} />
 
       <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3">
         {lastUpdated && (
           <span
             className="text-sm leading-[1.21]"
-            style={{ color: "#696969" }}
+            style={{ color: "var(--color-fg-muted)" }}
           >
             Last Updated: {lastUpdated}
           </span>
@@ -141,13 +141,14 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
 
         <div className="flex flex-row items-center gap-[6px]">
           <button
-            className="flex flex-row items-center justify-center gap-[6px] rounded-full border py-[9px] pl-[10px] pr-[11px] transition-opacity hover:opacity-80"
-            style={{ backgroundColor: "#212124", borderColor: "#262627" }}
+            aria-label={`Share ${user.displayName || user.username}'s profile`}
+            className="flex flex-row items-center justify-center gap-[6px] rounded-full border py-[9px] pl-[10px] pr-[11px] transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            style={{ backgroundColor: "var(--color-btn-bg)", borderColor: "var(--color-border-default)" }}
           >
-            <Image src="/icons/icon-share.svg" alt="Share" width={20} height={20} />
+            <Image src="/icons/icon-share.svg" alt="" width={20} height={20} aria-hidden="true" />
             <span
               className="text-sm leading-none"
-              style={{ color: "#FFFFFF" }}
+              style={{ color: "var(--color-fg-default)" }}
             >
               Share
             </span>
@@ -157,13 +158,14 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
             href={`https://github.com/${user.username}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-row items-center justify-center gap-[6px] rounded-full border py-[9px] pl-[10px] pr-[11px] transition-opacity hover:opacity-80"
-            style={{ backgroundColor: "#212124", borderColor: "#262627" }}
+            aria-label={`View ${user.username}'s GitHub profile (opens in new tab)`}
+            className="flex flex-row items-center justify-center gap-[6px] rounded-full border py-[9px] pl-[10px] pr-[11px] transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            style={{ backgroundColor: "var(--color-btn-bg)", borderColor: "var(--color-border-default)" }}
           >
-            <Image src="/icons/icon-github.svg" alt="GitHub" width={20} height={20} />
+            <Image src="/icons/icon-github.svg" alt="" width={20} height={20} aria-hidden="true" />
             <span
               className="text-sm leading-none"
-              style={{ color: "#FFFFFF" }}
+              style={{ color: "var(--color-fg-default)" }}
             >
               GitHub
             </span>
@@ -188,34 +190,62 @@ export function ProfileTabBar({ activeTab, onTabChange }: ProfileTabBarProps) {
     { id: "models", label: "Models Used" },
   ];
 
+  const handleKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = (currentIndex + 1) % tabs.length;
+      onTabChange(tabs[nextIndex].id);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      onTabChange(tabs[prevIndex].id);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      onTabChange(tabs[0].id);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      onTabChange(tabs[tabs.length - 1].id);
+    }
+  };
+
   return (
     <div
+      role="tablist"
+      aria-label="Profile tabs"
       className="inline-flex flex-row items-center rounded-[25px] border p-[6px]"
       style={{
         width: "fit-content",
-        backgroundColor: "#1F1F20",
-        borderColor: "#262627",
+        backgroundColor: "var(--color-bg-elevated)",
+        borderColor: "var(--color-border-default)",
       }}
     >
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          className="flex items-center justify-center rounded-[25px] px-5 py-[10px] transition-colors"
-          style={{
-            backgroundColor: activeTab === tab.id ? "#2C2C2F" : "transparent",
-          }}
-        >
-          <span
-            className="text-lg font-semibold leading-none whitespace-nowrap"
+      {tabs.map((tab, index) => {
+        const isActive = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={`tabpanel-${tab.id}`}
+            tabIndex={isActive ? 0 : -1}
+            onClick={() => onTabChange(tab.id)}
+            onKeyDown={(e) => handleKeyDown(e, index)}
+            className="flex items-center justify-center rounded-[25px] px-5 py-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             style={{
-              color: activeTab === tab.id ? "#FFFFFF" : "rgba(255, 255, 255, 0.5)",
+              backgroundColor: isActive ? "var(--color-bg-active)" : "transparent",
             }}
           >
-            {tab.label}
-          </span>
-        </button>
-      ))}
+            <span
+              className="text-lg font-semibold leading-none whitespace-nowrap"
+              style={{
+                color: isActive ? "var(--color-fg-default)" : "color-mix(in srgb, var(--color-fg-default) 50%, transparent)",
+              }}
+            >
+              {tab.label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -237,13 +267,13 @@ export function TokenBreakdown({ stats }: TokenBreakdownProps) {
   return (
     <div
       className="rounded-2xl border p-4 sm:p-6"
-      style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+      style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
     >
       {totalTokens > 0 && (
         <div className="mb-6">
           <div
             className="h-3 rounded-full overflow-hidden flex"
-            style={{ backgroundColor: "#262627" }}
+            style={{ backgroundColor: "var(--color-bg-subtle)" }}
           >
             {tokenTypes.map((type) => (
               <div
@@ -265,16 +295,16 @@ export function TokenBreakdown({ stats }: TokenBreakdownProps) {
             <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: type.color }} />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-xs" style={{ color: "#696969" }}>{type.label}</p>
+                <p className="text-xs" style={{ color: "var(--color-fg-muted)" }}>{type.label}</p>
                 {type.percentage > 0 && (
-                  <span className="text-xs" style={{ color: "#525252" }}>
+                  <span className="text-xs" style={{ color: "var(--color-fg-subtle)" }}>
                     {type.percentage.toFixed(1)}%
                   </span>
                 )}
               </div>
               <p
                 className="text-base sm:text-lg font-semibold"
-                style={{ color: "#FFFFFF" }}
+                style={{ color: "var(--color-fg-default)" }}
               >
                 {formatNumber(type.value)}
               </p>
@@ -295,21 +325,21 @@ export interface ProfileStatsProps {
 
 export function ProfileStats({ stats, currentStreak = 0, longestStreak = 0, favoriteModel }: ProfileStatsProps) {
   const statItems = [
-    { label: "Active Days", value: stats.activeDays.toString(), color: "#53d1f3" },
-    { label: "Current Streak", value: `${currentStreak} days`, color: "#53d1f3" },
-    { label: "Longest Streak", value: `${longestStreak} days`, color: "#53d1f3" },
-    { label: "Submissions", value: (stats.submissionCount ?? 0).toString(), color: "#53d1f3" },
+    { label: "Active Days", value: stats.activeDays.toString(), color: "var(--color-primary)" },
+    { label: "Current Streak", value: `${currentStreak} days`, color: "var(--color-primary)" },
+    { label: "Longest Streak", value: `${longestStreak} days`, color: "var(--color-primary)" },
+    { label: "Submissions", value: (stats.submissionCount ?? 0).toString(), color: "var(--color-primary)" },
   ];
 
   return (
     <div
       className="rounded-2xl border p-4 sm:p-6"
-      style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+      style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
     >
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
         {statItems.map((item) => (
           <div key={item.label} className="flex flex-col gap-1">
-            <p className="text-xs sm:text-sm" style={{ color: "#696969" }}>{item.label}</p>
+            <p className="text-xs sm:text-sm" style={{ color: "var(--color-fg-muted)" }}>{item.label}</p>
             <p
               className="text-lg sm:text-xl font-bold"
               style={{ color: item.color }}
@@ -321,12 +351,12 @@ export function ProfileStats({ stats, currentStreak = 0, longestStreak = 0, favo
       </div>
 
       {favoriteModel && (
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: "#262627" }}>
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--color-border-default)" }}>
           <div className="flex items-center gap-2">
-            <span className="text-sm" style={{ color: "#696969" }}>Favorite Model:</span>
+            <span className="text-sm" style={{ color: "var(--color-fg-muted)" }}>Favorite Model:</span>
             <span
               className="px-2 py-1 rounded-md text-sm font-medium"
-              style={{ backgroundColor: "#262627", color: "#FFFFFF" }}
+              style={{ backgroundColor: "var(--color-bg-subtle)", color: "var(--color-fg-default)" }}
             >
               {favoriteModel}
             </span>
@@ -381,11 +411,11 @@ export function ProfileModels({ models, modelUsage }: ProfileModelsProps) {
     return (
       <div
         className="rounded-2xl border overflow-hidden"
-        style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+        style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
       >
         <div
           className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 sm:px-6 py-3 text-xs font-medium uppercase tracking-wider border-b"
-          style={{ backgroundColor: "#1F1F20", borderColor: "#262627", color: "#696969" }}
+          style={{ backgroundColor: "var(--color-bg-elevated)", borderColor: "var(--color-border-default)", color: "var(--color-fg-muted)" }}
         >
           <div>Model</div>
           <div className="text-right w-20 sm:w-24">Tokens</div>
@@ -393,13 +423,13 @@ export function ProfileModels({ models, modelUsage }: ProfileModelsProps) {
           <div className="text-right w-12 sm:w-16">%</div>
         </div>
 
-        <div className="divide-y" style={{ borderColor: "#262627" }}>
+        <div className="divide-y" style={{ borderColor: "var(--color-border-default)" }}>
           {sortedUsage.map((usage, index) => (
             <div
               key={usage.model}
               className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 sm:px-6 py-3 items-center"
               style={{
-                backgroundColor: index % 2 === 1 ? "#1A1A1B" : "transparent",
+                backgroundColor: index % 2 === 1 ? "var(--color-bg-elevated)" : "transparent",
               }}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -409,23 +439,23 @@ export function ProfileModels({ models, modelUsage }: ProfileModelsProps) {
                 />
                 <span
                   className="text-sm font-medium truncate"
-                  style={{ color: "#FFFFFF" }}
+                  style={{ color: "var(--color-fg-default)" }}
                 >
                   {usage.model}
                 </span>
               </div>
               <div className="text-right w-20 sm:w-24">
-                <span className="text-sm" style={{ color: "#FFFFFF" }}>
+                <span className="text-sm" style={{ color: "var(--color-fg-default)" }}>
                   {formatNumber(usage.tokens)}
                 </span>
               </div>
               <div className="text-right w-16 sm:w-20">
-                <span className="text-sm font-medium" style={{ color: "#53d1f3" }}>
+                <span className="text-sm font-medium" style={{ color: "var(--color-primary)" }}>
                   {formatCurrency(usage.cost)}
                 </span>
               </div>
               <div className="text-right w-12 sm:w-16">
-                <span className="text-sm" style={{ color: "#696969" }}>
+                <span className="text-sm" style={{ color: "var(--color-fg-muted)" }}>
                   {usage.percentage.toFixed(1)}%
                 </span>
               </div>
@@ -439,14 +469,14 @@ export function ProfileModels({ models, modelUsage }: ProfileModelsProps) {
   return (
     <div
       className="rounded-2xl border p-4 sm:p-6"
-      style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+      style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
     >
       <div className="flex flex-wrap gap-2">
         {filteredModels.map((model) => (
           <span
             key={model}
             className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium"
-            style={{ backgroundColor: "#262627", color: "#FFFFFF" }}
+            style={{ backgroundColor: "var(--color-bg-subtle)", color: "var(--color-fg-default)" }}
           >
             <span
               className="w-2 h-2 rounded-full"
@@ -478,9 +508,9 @@ export function ProfileEmptyActivity() {
   return (
     <div
       className="rounded-2xl border p-6 sm:p-8 text-center"
-      style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+      style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
     >
-      <p className="text-sm sm:text-base" style={{ color: "#696969" }}>
+      <p className="text-sm sm:text-base" style={{ color: "var(--color-fg-muted)" }}>
         No contribution data available yet.
       </p>
     </div>

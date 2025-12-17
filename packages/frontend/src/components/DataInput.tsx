@@ -58,14 +58,14 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
   return (
     <div className="w-full max-w-4xl mx-auto">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold tracking-tight mb-3" style={{ color: "#FFFFFF" }}>
+        <h2 className="text-3xl font-bold tracking-tight mb-3" style={{ color: "var(--color-fg-default)" }}>
           Load Token Usage Data
         </h2>
-        <p style={{ color: "#696969" }}>
+        <p style={{ color: "var(--color-fg-muted)" }}>
           Paste JSON from{" "}
           <code
             className="px-2 py-1 rounded-lg text-sm font-mono"
-            style={{ backgroundColor: "#262627" }}
+            style={{ backgroundColor: "var(--color-bg-subtle)" }}
           >
             tokscale graph
           </code>{" "}
@@ -88,24 +88,24 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
           }}
           placeholder='{"meta": {...}, "summary": {...}, "contributions": [...]}'
           className={`w-full h-72 p-4 font-mono text-sm rounded-2xl border-2 resize-y focus:outline-none focus:ring-4 transition-all duration-200 ${
-            error ? "border-red-500 focus:ring-red-500/20" : "border-[#262627]"
+            error ? "border-red-500 focus:ring-red-500/20" : "border-[var(--color-border-default)]"
           }`}
           style={{
-            backgroundColor: "#1F1F20",
-            color: "#FFFFFF",
+            backgroundColor: "var(--color-bg-elevated)",
+            color: "var(--color-fg-default)",
           }}
           onFocus={(e) => {
             if (!error) {
-              e.currentTarget.style.borderColor = "#53d1f3";
+              e.currentTarget.style.borderColor = "var(--color-primary)";
             }
           }}
           onBlur={(e) => {
             if (!error) {
-              e.currentTarget.style.borderColor = "#262627";
+              e.currentTarget.style.borderColor = "var(--color-border-default)";
             }
           }}
         />
-        <p className="mt-2 text-sm" style={{ color: "#696969" }}>
+        <p className="mt-2 text-sm" style={{ color: "var(--color-fg-muted)" }}>
           Tip: Press Ctrl+Enter (Cmd+Enter on Mac) to parse
         </p>
       </div>
@@ -126,7 +126,7 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
           onClick={parseJson}
           disabled={isLoading || !rawJson.trim()}
           className="px-6 py-3 rounded-full font-semibold text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 hover:opacity-90"
-          style={{ backgroundColor: "#53d1f3", boxShadow: "0 10px 15px -3px rgba(83, 209, 243, 0.25)" }}
+          style={{ backgroundColor: "var(--color-primary)", boxShadow: "0 10px 15px -3px rgba(83, 209, 243, 0.25)" }}
         >
           Parse JSON
         </button>
@@ -135,7 +135,7 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
           onClick={loadSampleData}
           disabled={isLoading}
           className="px-6 py-3 rounded-full font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
-          style={{ backgroundColor: "#262627", color: "#FFFFFF" }}
+          style={{ backgroundColor: "var(--color-bg-subtle)", color: "var(--color-fg-default)" }}
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
@@ -169,17 +169,17 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
 
       <div
         className="mt-10 p-6 rounded-2xl border"
-        style={{ backgroundColor: "#1F1F20", borderColor: "#262627" }}
+        style={{ backgroundColor: "var(--color-card-bg)", borderColor: "var(--color-border-default)" }}
       >
-        <h3 className="text-base font-bold mb-4" style={{ color: "#FFFFFF" }}>
+        <h3 className="text-base font-bold mb-4" style={{ color: "var(--color-fg-default)" }}>
           How to get your data
         </h3>
-        <ol className="text-sm space-y-3 list-decimal list-inside" style={{ color: "#696969" }}>
+        <ol className="text-sm space-y-3 list-decimal list-inside" style={{ color: "var(--color-fg-muted)" }}>
           <li className="leading-relaxed">
             Install token-tracker:{" "}
             <code
               className="px-2 py-1 rounded-lg text-xs font-mono"
-              style={{ backgroundColor: "#262627" }}
+              style={{ backgroundColor: "var(--color-bg-subtle)" }}
             >
               npx tsx src/cli.ts graph
             </code>
@@ -188,7 +188,7 @@ export function DataInput({ onDataLoaded }: DataInputProps) {
             Run the graph command:{" "}
             <code
               className="px-2 py-1 rounded-lg text-xs font-mono"
-              style={{ backgroundColor: "#262627" }}
+              style={{ backgroundColor: "var(--color-bg-subtle)" }}
             >
               tokscale graph
             </code>

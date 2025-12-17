@@ -8,7 +8,7 @@ export function Skeleton({ className = "" }: SkeletonProps) {
   return (
     <div
       className={`animate-pulse rounded ${className}`}
-      style={{ backgroundColor: "#262627" }}
+      style={{ backgroundColor: "var(--color-border-default)" }}
     />
   );
 }
@@ -21,7 +21,7 @@ export function LeaderboardSkeleton() {
           <div
             key={i}
             className="rounded-xl border p-4"
-            style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+            style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
           >
             <Skeleton className="h-4 w-20 mb-2" />
             <Skeleton className="h-8 w-24" />
@@ -35,7 +35,7 @@ export function LeaderboardSkeleton() {
       >
         <div
           className="border-b px-6 py-3"
-          style={{ backgroundColor: "#1F1F20", borderColor: "#262627" }}
+          style={{ backgroundColor: "var(--color-bg-elevated)", borderColor: "var(--color-border-default)" }}
         >
           <div className="flex gap-6">
             <Skeleton className="h-4 w-12" />
@@ -48,7 +48,7 @@ export function LeaderboardSkeleton() {
           <div
             key={i}
             className="px-6 py-4 border-b last:border-0"
-            style={{ borderColor: "#262627" }}
+            style={{ borderColor: "var(--color-border-default)" }}
           >
             <div className="flex items-center gap-6">
               <Skeleton className="h-6 w-8" />
@@ -92,7 +92,7 @@ export function ProfileSkeleton() {
           <div
             key={i}
             className="rounded-xl border p-4"
-            style={{ backgroundColor: "#141415", borderColor: "#262627" }}
+            style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
           >
             <Skeleton className="h-4 w-20 mb-2" />
             <Skeleton className="h-8 w-24" />

@@ -1,6 +1,6 @@
 {
   "name": "tokscale",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "Alias for @tokscale/cli - Track your AI coding assistant token usage",
   "type": "module",
   "main": "index.js",
@@ -27,7 +27,7 @@
     "cli"
   ],
   "dependencies": {
-    "@tokscale/cli": "^1.0.2"
+    "@tokscale/cli": "^1.0.0"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",

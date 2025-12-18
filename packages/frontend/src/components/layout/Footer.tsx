@@ -10,7 +10,7 @@ export function Footer() {
               src="/assets/footer-logo-icon.png"
               alt="Tokscale Icon"
               fill
-              className="object-contain animate-[spin_10s_linear_infinite]"
+              className="object-contain"
             />
           </div>
 
@@ -52,7 +52,7 @@ export function Footer() {
             alt=""
             width={435}
             height={435}
-            className="w-[435px] h-auto"
+            className="w-[435px] h-auto animate-[spin_60s_linear_infinite]"
             priority
           />
         </div>

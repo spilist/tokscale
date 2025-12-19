@@ -314,10 +314,10 @@ export default function LeaderboardPage() {
           </p>
           <div className="space-y-2 font-mono text-sm">
             <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--color-bg-elevated)", color: "var(--color-fg-muted)" }}>
-              <span style={{ color: "var(--color-primary)" }}>$</span> npx tokscale login
+              <span style={{ color: "var(--color-primary)" }}>$</span> bunx tokscale login
             </div>
             <div className="p-3 rounded-lg" style={{ backgroundColor: "var(--color-bg-elevated)", color: "var(--color-fg-muted)" }}>
-              <span style={{ color: "var(--color-primary)" }}>$</span> npx tokscale submit
+              <span style={{ color: "var(--color-primary)" }}>$</span> bunx tokscale submit
             </div>
           </div>
         </div>

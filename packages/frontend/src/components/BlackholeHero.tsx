@@ -9,7 +9,7 @@ export function BlackholeHero() {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText("npx tokscale");
+    navigator.clipboard.writeText("bunx tokscale");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -96,7 +96,7 @@ export function BlackholeHero() {
                   letterSpacing: "-0.8px",
                 }}
               >
-                npx&nbsp;
+                bunx&nbsp;
               </span>
               <span
                 style={{

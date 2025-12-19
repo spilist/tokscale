@@ -54,9 +54,16 @@ export function BarChart(props: BarChartProps) {
   });
 
   const chartWidth = () => Math.max(width() - 8, 20);
-  const barWidth = () => Math.max(1, Math.floor(chartWidth() / Math.min(data().length, 52)));
-  const visibleBars = () => Math.min(data().length, Math.floor(chartWidth() / barWidth()));
-  const visibleData = createMemo(() => data().slice(-visibleBars()));
+  
+  const getBarWidth = (index: number, total: number) => {
+    const cw = chartWidth();
+    if (total === 0) return 1;
+    const start = Math.floor((index * cw) / total);
+    const end = Math.floor(((index + 1) * cw) / total);
+    return Math.max(1, end - start);
+  };
+  
+  const visibleData = () => data();
 
   const sortedModelsMap = createMemo(() => {
     const vd = visibleData();
@@ -99,7 +106,7 @@ export function BarChart(props: BarChartProps) {
     return labels;
   });
 
-  const axisWidth = () => Math.min(chartWidth(), visibleBars() * barWidth());
+  const axisWidth = () => chartWidth();
   const labelPadding = () => {
     const labels = dateLabels();
     return labels.length > 0 ? Math.floor(axisWidth() / labels.length) : 0;
@@ -107,13 +114,13 @@ export function BarChart(props: BarChartProps) {
 
   const chartTitle = () => isVeryNarrowTerminal() ? "Tokens" : "Tokens per Day";
 
-  const getBarContent = (point: ChartDataPoint, row: number): { char: string; color: string } => {
+  const getBarContent = (point: ChartDataPoint, row: number, barIndex: number): { char: string; color: string } => {
     const mt = maxTotal();
     const sh = safeHeight();
     const rowThreshold = ((row + 1) / sh) * mt;
     const prevThreshold = (row / sh) * mt;
     const thresholdDiff = rowThreshold - prevThreshold;
-    const bw = barWidth();
+    const bw = getBarWidth(barIndex, visibleData().length);
 
     if (point.total <= prevThreshold) {
       return { char: getRepeatedString(" ", bw), color: "dim" };
@@ -169,8 +176,8 @@ export function BarChart(props: BarChartProps) {
               <box flexDirection="row">
                 <text dim>{yLabel}│</text>
                 <For each={visibleData()}>
-                  {(point) => {
-                    const bar = getBarContent(point, row);
+                  {(point, barIndex) => {
+                    const bar = getBarContent(point, row, barIndex());
                     return bar.color === "dim" 
                       ? <text dim>{bar.char}</text>
                       : <text fg={bar.color}>{bar.char}</text>;

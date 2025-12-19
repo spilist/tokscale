@@ -95,7 +95,7 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
               className="text-base font-semibold leading-none"
               style={{ color: "var(--color-accent-blue)" }}
             >
-              Total Usage Cost
+              Total Tokens
             </span>
             <span
               className="text-[27px] font-bold leading-none"
@@ -105,8 +105,9 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
               }}
+              title={stats.totalTokens.toLocaleString()}
             >
-              {formatCurrency(stats.totalCost)}
+              {formatNumber(stats.totalTokens)}
             </span>
           </div>
 
@@ -115,13 +116,14 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
               className="text-base font-semibold leading-none"
               style={{ color: "var(--color-fg-default)" }}
             >
-              Total Tokens
+              Total Cost
             </span>
             <span
               className="text-[27px] font-bold leading-none"
               style={{ color: "var(--color-fg-default)" }}
+              title={stats.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
             >
-              {formatNumber(stats.totalTokens)}
+              {formatCurrency(stats.totalCost)}
             </span>
           </div>
         </div>

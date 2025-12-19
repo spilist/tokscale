@@ -84,7 +84,11 @@ export default function LeaderboardPage() {
               <p className="text-xs sm:text-sm" style={{ color: "var(--color-fg-muted)" }}>
                 Total Tokens
               </p>
-              <p className="text-xl sm:text-2xl font-bold" style={{ color: "var(--color-fg-default)" }}>
+              <p
+                className="text-xl sm:text-2xl font-bold"
+                style={{ color: "var(--color-primary)" }}
+                title={data ? data.stats.totalTokens.toLocaleString() : undefined}
+              >
                 {data ? formatNumber(data.stats.totalTokens) : "-"}
               </p>
             </div>
@@ -95,7 +99,11 @@ export default function LeaderboardPage() {
               <p className="text-xs sm:text-sm" style={{ color: "var(--color-fg-muted)" }}>
                 Total Cost
               </p>
-              <p className="text-xl sm:text-2xl font-bold" style={{ color: "var(--color-primary)" }}>
+              <p
+                className="text-xl sm:text-2xl font-bold"
+                style={{ color: "var(--color-fg-default)" }}
+                title={data ? data.stats.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }) : undefined}
+              >
                 {data ? formatCurrency(data.stats.totalCost) : "-"}
               </p>
             </div>
@@ -186,13 +194,13 @@ export default function LeaderboardPage() {
                           className="px-3 sm:px-6 py-3 text-right text-xs font-medium uppercase tracking-wider"
                           style={{ color: "var(--color-fg-muted)" }}
                         >
-                          Tokens
+                          Cost
                         </th>
                         <th
                           className="px-3 sm:px-6 py-3 text-right text-xs font-medium uppercase tracking-wider"
                           style={{ color: "var(--color-fg-muted)" }}
                         >
-                          Cost
+                          Tokens
                         </th>
                         <th
                           className="px-3 sm:px-6 py-3 text-right text-xs font-medium uppercase tracking-wider hidden md:table-cell"
@@ -258,16 +266,18 @@ export default function LeaderboardPage() {
                             <span
                               className="font-medium text-sm sm:text-base"
                               style={{ color: "var(--color-fg-default)" }}
+                              title={user.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}
                             >
-                              {formatNumber(user.totalTokens)}
+                              {formatCurrency(user.totalCost)}
                             </span>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right">
                             <span
                               className="font-medium text-sm sm:text-base"
                               style={{ color: "var(--color-primary)" }}
+                              title={user.totalTokens.toLocaleString()}
                             >
-                              {formatCurrency(user.totalCost)}
+                              {formatNumber(user.totalTokens)}
                             </span>
                           </td>
                           <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right hidden md:table-cell">

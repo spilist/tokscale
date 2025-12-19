@@ -2,6 +2,12 @@ declare module "string-width" {
   export default function stringWidth(str: string): number;
 }
 
+declare module "./tui-bundle.js" {
+  import type { TUIOptions } from "./tui/types/index.js";
+  export function launchTUI(options?: TUIOptions): Promise<void>;
+  export type { TUIOptions };
+}
+
 declare module "bun" {
   export interface BunSubprocess {
     stdin: any;

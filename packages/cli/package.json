@@ -9,7 +9,8 @@
     "tokscale": "./dist/cli.js"
   },
   "files": [
-    "dist/**/*"
+    "dist/**/*",
+    "src/tui/**/*"
   ],
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
@@ -21,7 +22,8 @@
     "directory": "packages/cli"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && bun run build:tui",
+    "build:tui": "echo 'TUI bundling skipped - OpenTUI requires Bun runtime'",
     "dev": "bun src/cli.ts",
     "dev:node": "tsx src/cli.ts",
     "tui": "bun src/cli.ts tui",

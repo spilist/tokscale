@@ -54,12 +54,23 @@ async function tryLoadTUI(): Promise<LaunchTUIFunction | null> {
   if (tuiLoadAttempted) return cachedTUILoader;
   tuiLoadAttempted = true;
   
+  const isBun = typeof (globalThis as Record<string, unknown>).Bun !== "undefined";
+  
+  if (!isBun) {
+    return null;
+  }
+  
+  const currentDir = new URL(".", import.meta.url).pathname;
+  const isDevMode = currentDir.includes("/src/");
+  const tuiPath = isDevMode
+    ? new URL("./tui/index.tsx", import.meta.url).href
+    : new URL("../src/tui/index.tsx", import.meta.url).href;
+  
   try {
-    const tuiModule = await import("./tui/index.js");
+    const tuiModule = await import(tuiPath) as { launchTUI: LaunchTUIFunction };
     cachedTUILoader = tuiModule.launchTUI;
     return cachedTUILoader;
   } catch (error) {
-    // Log error for debugging (only in verbose mode or when DEBUG is set)
     if (process.env.DEBUG) {
       console.error("TUI load error:", error);
     }

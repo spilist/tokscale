@@ -479,7 +479,7 @@ const NATIVE_TIMEOUT_MS = parseInt(
 );
 
 const SIGKILL_GRACE_MS = 500;
-const DEFAULT_MAX_OUTPUT_BYTES = 50 * 1024 * 1024;
+const DEFAULT_MAX_OUTPUT_BYTES = 100 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = parseInt(
   process.env.TOKSCALE_MAX_OUTPUT_BYTES || String(DEFAULT_MAX_OUTPUT_BYTES),
   10
@@ -612,7 +612,8 @@ async function runInSubprocessBun<T>(method: string, args: unknown[]): Promise<T
 
     const [stdout, stderr, exitCode] = await Promise.race([workPromise, timeoutPromise]);
 
-    if (weInitiatedKill || proc.killed || proc.signalCode) {
+    // Note: proc.killed is always true after exit in Bun (even for normal exits), so we only check signalCode
+    if (weInitiatedKill || proc.signalCode) {
       throw new Error(
         `Subprocess '${method}' was killed (signal: ${proc.signalCode || "SIGTERM"})`
       );

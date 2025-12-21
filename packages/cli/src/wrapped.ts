@@ -1,6 +1,7 @@
-import { createCanvas } from "@napi-rs/canvas";
+import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as os from "node:os";
 import {
   parseLocalSourcesAsync,
   finalizeReportAsync,
@@ -41,12 +42,12 @@ const COLORS = {
   textPrimary: "#ffffff",
   textSecondary: "#888888",
   textMuted: "#555555",
-  accent: "#ff6b35",
+  accent: "#58a6ff",
   grade0: "#2d2d2d",
-  grade1: "#ff6b3544",
-  grade2: "#ff6b3588",
-  grade3: "#ff6b35cc",
-  grade4: "#ff6b35",
+  grade1: "#58a6ff44",
+  grade2: "#58a6ff88",
+  grade3: "#58a6ffcc",
+  grade4: "#58a6ff",
 };
 
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
@@ -56,6 +57,77 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   gemini: "Gemini CLI",
   cursor: "Cursor IDE",
 };
+
+const ASSETS_BASE_URL = "https://tokscale.ai/assets";
+
+const CLIENT_LOGO_URLS: Record<string, string> = {
+  "OpenCode": `${ASSETS_BASE_URL}/client-opencode.png`,
+  "Claude Code": `${ASSETS_BASE_URL}/client-claude.jpg`,
+  "Codex CLI": `${ASSETS_BASE_URL}/client-openai.jpg`,
+  "Gemini CLI": `${ASSETS_BASE_URL}/client-gemini.png`,
+  "Cursor IDE": `${ASSETS_BASE_URL}/client-cursor.jpg`,
+};
+
+const TOKSCALE_LOGO_URL = `${ASSETS_BASE_URL}/footer-logo-icon.png`;
+
+function getImageCacheDir(): string {
+  return path.join(os.homedir(), ".cache", "tokscale", "images");
+}
+
+function getFontCacheDir(): string {
+  return path.join(os.homedir(), ".cache", "tokscale", "fonts");
+}
+
+async function fetchAndCacheImage(url: string, filename: string): Promise<string> {
+  const cacheDir = getImageCacheDir();
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  
+  const cachedPath = path.join(cacheDir, filename);
+  
+  if (!fs.existsSync(cachedPath)) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+    const buffer = await response.arrayBuffer();
+    fs.writeFileSync(cachedPath, Buffer.from(buffer));
+  }
+  
+  return cachedPath;
+}
+
+const FIGTREE_FONTS = [
+  { weight: "400", file: "Figtree-Regular.ttf", url: "https://fonts.gstatic.com/s/figtree/v9/_Xmz-HUzqDCFdgfMsYiV_F7wfS-Bs_d_QF5e.ttf" },
+  { weight: "700", file: "Figtree-Bold.ttf", url: "https://fonts.gstatic.com/s/figtree/v9/_Xmz-HUzqDCFdgfMsYiV_F7wfS-Bs_eYR15e.ttf" },
+];
+
+let fontsRegistered = false;
+
+async function ensureFontsLoaded(): Promise<void> {
+  if (fontsRegistered) return;
+  
+  const cacheDir = getFontCacheDir();
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+
+  for (const font of FIGTREE_FONTS) {
+    const fontPath = path.join(cacheDir, font.file);
+    
+    if (!fs.existsSync(fontPath)) {
+      const response = await fetch(font.url);
+      if (!response.ok) continue;
+      const buffer = await response.arrayBuffer();
+      fs.writeFileSync(fontPath, Buffer.from(buffer));
+    }
+
+    if (fs.existsSync(fontPath)) {
+      GlobalFonts.registerFromPath(fontPath, "Figtree");
+    }
+  }
+
+  fontsRegistered = true;
+}
 
 async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
   const year = options.year || new Date().getFullYear().toString();
@@ -421,11 +493,11 @@ function drawStat(
   value: string
 ) {
   ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = "18px sans-serif";
+  ctx.font = "18px Figtree, sans-serif";
   ctx.fillText(label, x, y);
   
   ctx.fillStyle = COLORS.textPrimary;
-  ctx.font = "bold 36px sans-serif";
+  ctx.font = "bold 36px Figtree, sans-serif";
   ctx.fillText(value, x, y + 40);
 }
 
@@ -435,6 +507,8 @@ function formatDate(dateStr: string): string {
 }
 
 async function generateWrappedImage(data: WrappedData): Promise<Buffer> {
+  await ensureFontsLoaded();
+  
   const canvas = createCanvas(IMAGE_WIDTH, IMAGE_HEIGHT);
   const ctx = canvas.getContext("2d");
 
@@ -448,50 +522,71 @@ async function generateWrappedImage(data: WrappedData): Promise<Buffer> {
   let yPos = PADDING;
 
   ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = "24px sans-serif";
+  ctx.font = "24px Figtree, sans-serif";
   ctx.fillText(`Tracking since ${formatDate(data.firstDay)}`, PADDING, yPos);
   yPos += 60;
 
   ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = "20px sans-serif";
+  ctx.font = "20px Figtree, sans-serif";
   ctx.fillText("Total Cost", PADDING, yPos);
   yPos += 10;
   
   ctx.fillStyle = COLORS.textPrimary;
-  ctx.font = "bold 56px sans-serif";
+  ctx.font = "bold 56px Figtree, sans-serif";
   ctx.fillText(formatCost(data.totalCost), PADDING, yPos + 50);
   yPos += 100;
 
   ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = "20px sans-serif";
+  ctx.font = "20px Figtree, sans-serif";
   ctx.fillText("Top Models", PADDING, yPos);
   yPos += 40;
 
   for (let i = 0; i < data.topModels.length; i++) {
     const model = data.topModels[i];
     ctx.fillStyle = COLORS.textPrimary;
-    ctx.font = "bold 32px sans-serif";
+    ctx.font = "bold 32px Figtree, sans-serif";
     ctx.fillText(`${i + 1}`, PADDING, yPos);
     
-    ctx.font = "32px sans-serif";
+    ctx.font = "32px Figtree, sans-serif";
     ctx.fillText(formatModelName(model.name), PADDING + 40, yPos);
     yPos += 50;
   }
   yPos += 30;
 
   ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = "20px sans-serif";
+  ctx.font = "20px Figtree, sans-serif";
   ctx.fillText("Top Clients", PADDING, yPos);
   yPos += 40;
 
+  const logoSize = 32;
+  
   for (let i = 0; i < data.topClients.length; i++) {
     const client = data.topClients[i];
     ctx.fillStyle = COLORS.textPrimary;
-    ctx.font = "bold 32px sans-serif";
+    ctx.font = "bold 32px Figtree, sans-serif";
     ctx.fillText(`${i + 1}`, PADDING, yPos);
     
-    ctx.font = "32px sans-serif";
-    ctx.fillText(client.name, PADDING + 40, yPos);
+    const logoUrl = CLIENT_LOGO_URLS[client.name];
+    if (logoUrl) {
+      try {
+        const filename = `client-${client.name.toLowerCase().replace(/\s+/g, "-")}.png`;
+        const logoPath = await fetchAndCacheImage(logoUrl, filename);
+        const logo = await loadImage(logoPath);
+        const logoY = yPos - logoSize + 6;
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(PADDING + 40 + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(logo, PADDING + 40, logoY, logoSize, logoSize);
+        ctx.restore();
+      } catch {
+      }
+    }
+    
+    ctx.font = "32px Figtree, sans-serif";
+    ctx.fillText(client.name, PADDING + 40 + logoSize + 12, yPos);
     yPos += 50;
   }
   yPos += 40;
@@ -516,19 +611,26 @@ async function generateWrappedImage(data: WrappedData): Promise<Buffer> {
 
   const footerY = IMAGE_HEIGHT - PADDING - 30;
   
-  ctx.fillStyle = COLORS.accent;
-  ctx.font = "bold 28px sans-serif";
-  ctx.fillText("◆", PADDING, footerY);
-  
-  ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = "24px sans-serif";
-  ctx.fillText(`tokscale.dev/${data.year}`, PADDING + 40, footerY);
-
   ctx.fillStyle = COLORS.textMuted;
-  ctx.font = "bold 120px sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(data.year, IMAGE_WIDTH - PADDING, footerY);
-  ctx.textAlign = "left";
+  ctx.font = "bold 120px Figtree, sans-serif";
+  ctx.fillText(data.year, PADDING, footerY);
+
+  try {
+    const logoPath = await fetchAndCacheImage(TOKSCALE_LOGO_URL, "footer-logo-icon.png");
+    const tokscaleLogo = await loadImage(logoPath);
+    const logoWidth = 48;
+    const logoHeight = 48;
+    const logoX = IMAGE_WIDTH - PADDING - logoWidth;
+    const logoY = footerY - logoHeight + 10;
+    ctx.drawImage(tokscaleLogo, logoX, logoY, logoWidth, logoHeight);
+    
+    ctx.fillStyle = COLORS.textSecondary;
+    ctx.font = "18px Figtree, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("github.com/junhoyeo/tokscale", IMAGE_WIDTH - PADDING, footerY + 20);
+    ctx.textAlign = "left";
+  } catch {
+  }
 
   return canvas.toBuffer("image/png");
 }

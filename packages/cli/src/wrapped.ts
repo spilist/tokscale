@@ -547,12 +547,12 @@ async function generateWrappedImage(data: WrappedData): Promise<Buffer> {
 
   ctx.fillStyle = COLORS.textSecondary;
   ctx.font = `${20 * SCALE}px Figtree, sans-serif`;
-  ctx.fillText("Total Cost", PADDING, yPos);
+  ctx.fillText("Total Tokens", PADDING, yPos);
   yPos += 20 * SCALE + 56 * SCALE;
   
-  ctx.fillStyle = COLORS.textPrimary;
+  ctx.fillStyle = COLORS.grade4;
   ctx.font = `bold ${56 * SCALE}px Figtree, sans-serif`;
-  ctx.fillText(formatCost(data.totalCost), PADDING, yPos);
+  ctx.fillText(formatTokens(data.totalTokens), PADDING, yPos);
   yPos += 50 * SCALE + 40 * SCALE;
 
   ctx.fillStyle = COLORS.textSecondary;
@@ -622,7 +622,7 @@ async function generateWrappedImage(data: WrappedData): Promise<Buffer> {
   drawStat(ctx, PADDING, statsStartY, "Messages", data.totalMessages.toLocaleString());
   drawStat(ctx, PADDING + statWidth, statsStartY, "Active Days", `${data.activeDays}`);
 
-  drawStat(ctx, PADDING, statsStartY + 100 * SCALE, "Tokens", formatTokens(data.totalTokens));
+  drawStat(ctx, PADDING, statsStartY + 100 * SCALE, "Cost", formatCost(data.totalCost));
   drawStat(ctx, PADDING + statWidth, statsStartY + 100 * SCALE, "Streak", `${data.longestStreak}d`);
 
   const footerBottomY = IMAGE_HEIGHT - PADDING;

@@ -12,7 +12,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const { username } = await params;
 
-    // Find user
     const [user] = await db
       .select({
         id: users.id,
@@ -29,75 +28,72 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Get aggregate stats from all submissions
-    const [stats] = await db
-      .select({
-        totalTokens: sql<number>`COALESCE(SUM(${submissions.totalTokens}), 0)`,
-        totalCost: sql<number>`COALESCE(SUM(CAST(${submissions.totalCost} AS DECIMAL(12,4))), 0)`,
-        inputTokens: sql<number>`COALESCE(SUM(${submissions.inputTokens}), 0)`,
-        outputTokens: sql<number>`COALESCE(SUM(${submissions.outputTokens}), 0)`,
-        cacheReadTokens: sql<number>`COALESCE(SUM(${submissions.cacheReadTokens}), 0)`,
-        cacheCreationTokens: sql<number>`COALESCE(SUM(${submissions.cacheCreationTokens}), 0)`,
-        submissionCount: sql<number>`COUNT(${submissions.id})`,
-        earliestDate: sql<string>`MIN(${submissions.dateStart})`,
-        latestDate: sql<string>`MAX(${submissions.dateEnd})`,
-      })
-      .from(submissions)
-      .where(eq(submissions.userId, user.id));
-
-    // Get latest submission for sources/models info
-    const [latestSubmission] = await db
-      .select({
-        sourcesUsed: submissions.sourcesUsed,
-        modelsUsed: submissions.modelsUsed,
-      })
-      .from(submissions)
-      .where(eq(submissions.userId, user.id))
-      .orderBy(desc(submissions.createdAt))
-      .limit(1);
-
-    // Get user rank
-    const rankResult = await db.execute<{ rank: number }>(sql`
-      WITH user_totals AS (
-        SELECT 
-          user_id,
-          SUM(total_tokens) as total_tokens
-        FROM submissions
-        GROUP BY user_id
-      ),
-      ranked AS (
-        SELECT 
-          user_id,
-          RANK() OVER (ORDER BY total_tokens DESC) as rank
-        FROM user_totals
-      )
-      SELECT rank FROM ranked WHERE user_id = ${user.id}
-    `);
-    const rank = (rankResult as unknown as { rank: number }[])[0]?.rank || null;
-
-    // Get daily breakdown data for graph (last 365 days)
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    const dailyData = await db
-      .select({
-        date: dailyBreakdown.date,
-        tokens: dailyBreakdown.tokens,
-        cost: dailyBreakdown.cost,
-        inputTokens: dailyBreakdown.inputTokens,
-        outputTokens: dailyBreakdown.outputTokens,
-        sourceBreakdown: dailyBreakdown.sourceBreakdown,
-        modelBreakdown: dailyBreakdown.modelBreakdown,
-      })
-      .from(dailyBreakdown)
-      .innerJoin(submissions, eq(dailyBreakdown.submissionId, submissions.id))
-      .where(
-        and(
-          eq(submissions.userId, user.id),
-          gte(dailyBreakdown.date, oneYearAgo.toISOString().split("T")[0])
+    const [statsResult, latestSubmissionResult, rankResult, dailyData] = await Promise.all([
+      db
+        .select({
+          totalTokens: sql<number>`COALESCE(SUM(${submissions.totalTokens}), 0)`,
+          totalCost: sql<number>`COALESCE(SUM(CAST(${submissions.totalCost} AS DECIMAL(12,4))), 0)`,
+          inputTokens: sql<number>`COALESCE(SUM(${submissions.inputTokens}), 0)`,
+          outputTokens: sql<number>`COALESCE(SUM(${submissions.outputTokens}), 0)`,
+          cacheReadTokens: sql<number>`COALESCE(SUM(${submissions.cacheReadTokens}), 0)`,
+          cacheCreationTokens: sql<number>`COALESCE(SUM(${submissions.cacheCreationTokens}), 0)`,
+          submissionCount: sql<number>`COUNT(${submissions.id})`,
+          earliestDate: sql<string>`MIN(${submissions.dateStart})`,
+          latestDate: sql<string>`MAX(${submissions.dateEnd})`,
+        })
+        .from(submissions)
+        .where(eq(submissions.userId, user.id)),
+
+      db
+        .select({
+          sourcesUsed: submissions.sourcesUsed,
+          modelsUsed: submissions.modelsUsed,
+        })
+        .from(submissions)
+        .where(eq(submissions.userId, user.id))
+        .orderBy(desc(submissions.createdAt))
+        .limit(1),
+
+      db.execute<{ rank: number }>(sql`
+        WITH user_totals AS (
+          SELECT user_id, SUM(total_tokens) as total_tokens
+          FROM submissions
+          GROUP BY user_id
+        ),
+        ranked AS (
+          SELECT user_id, RANK() OVER (ORDER BY total_tokens DESC) as rank
+          FROM user_totals
         )
-      )
-      .orderBy(dailyBreakdown.date);
+        SELECT rank FROM ranked WHERE user_id = ${user.id}
+      `),
+
+      db
+        .select({
+          date: dailyBreakdown.date,
+          tokens: dailyBreakdown.tokens,
+          cost: dailyBreakdown.cost,
+          inputTokens: dailyBreakdown.inputTokens,
+          outputTokens: dailyBreakdown.outputTokens,
+          sourceBreakdown: dailyBreakdown.sourceBreakdown,
+          modelBreakdown: dailyBreakdown.modelBreakdown,
+        })
+        .from(dailyBreakdown)
+        .innerJoin(submissions, eq(dailyBreakdown.submissionId, submissions.id))
+        .where(
+          and(
+            eq(submissions.userId, user.id),
+            gte(dailyBreakdown.date, oneYearAgo.toISOString().split("T")[0])
+          )
+        )
+        .orderBy(dailyBreakdown.date),
+    ]);
+
+    const stats = statsResult[0];
+    const latestSubmission = latestSubmissionResult[0];
+    const rank = (rankResult as unknown as { rank: number }[])[0]?.rank || null;
 
     // Source breakdown type
     type SourceBreakdown = {

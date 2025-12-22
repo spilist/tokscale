@@ -55,29 +55,21 @@ export async function GET(request: Request) {
       .limit(limit)
       .offset(offset);
 
-    const results = await leaderboardQuery;
+    const [results, globalStats] = await Promise.all([
+      leaderboardQuery,
+      db
+        .select({
+          totalTokens: sql<number>`SUM(${submissions.totalTokens})`,
+          totalCost: sql<number>`SUM(CAST(${submissions.totalCost} AS DECIMAL(12,4)))`,
+          totalSubmissions: sql<number>`COUNT(${submissions.id})`,
+          uniqueUsers: sql<number>`COUNT(DISTINCT ${submissions.userId})`,
+        })
+        .from(submissions)
+        .where(dateFilter),
+    ]);
 
-    // Get total count for pagination
-    const countQuery = await db
-      .select({
-        count: sql<number>`COUNT(DISTINCT ${submissions.userId})`,
-      })
-      .from(submissions)
-      .where(dateFilter);
-
-    const totalUsers = countQuery[0]?.count || 0;
+    const totalUsers = Number(globalStats[0]?.uniqueUsers) || 0;
     const totalPages = Math.ceil(totalUsers / limit);
-
-    // Get global stats
-    const globalStats = await db
-      .select({
-        totalTokens: sql<number>`SUM(${submissions.totalTokens})`,
-        totalCost: sql<number>`SUM(CAST(${submissions.totalCost} AS DECIMAL(12,4)))`,
-        totalSubmissions: sql<number>`COUNT(${submissions.id})`,
-        uniqueUsers: sql<number>`COUNT(DISTINCT ${submissions.userId})`,
-      })
-      .from(submissions)
-      .where(dateFilter);
 
     return NextResponse.json({
       users: results.map((row, index) => ({

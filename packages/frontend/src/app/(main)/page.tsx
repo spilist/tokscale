@@ -161,6 +161,7 @@ const TableCell = styled.td`
   padding-top: 12px;
   padding-bottom: 12px;
   white-space: nowrap;
+  vertical-align: top;
   
   @media (min-width: 640px) {
     padding-left: 24px;

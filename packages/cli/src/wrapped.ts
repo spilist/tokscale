@@ -24,6 +24,7 @@ interface WrappedData {
   longestStreak: number;
   topModels: Array<{ name: string; cost: number; tokens: number }>;
   topClients: Array<{ name: string; cost: number; tokens: number }>;
+  topAgents?: Array<{ name: string; cost: number; tokens: number; messages: number }>;
   contributions: Array<{ date: string; level: 0 | 1 | 2 | 3 | 4 }>;
   totalMessages: number;
 }
@@ -33,6 +34,8 @@ export interface WrappedOptions {
   year?: string;
   sources?: SourceType[];
   short?: boolean;
+  includeAgents?: boolean;
+  pinSisyphus?: boolean;
 }
 
 const SCALE = 2;
@@ -62,6 +65,25 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
 };
 
 const ASSETS_BASE_URL = "https://tokscale.ai/assets";
+
+const PINNED_AGENTS = ["Sisyphus", "Planner-Sisyphus"];
+
+function normalizeAgentName(agent: string): string {
+  const agentLower = agent.toLowerCase();
+
+  if (agentLower.includes("plan")) {
+    if (agentLower.includes("omo") || agentLower.includes("sisyphus")) {
+      return "Planner-Sisyphus";
+    }
+    return agent;
+  }
+
+  if (agentLower === "omo" || agentLower === "sisyphus") {
+    return "Sisyphus";
+  }
+
+  return agent;
+}
 
 const CLIENT_LOGO_URLS: Record<string, string> = {
   "OpenCode": `${ASSETS_BASE_URL}/client-opencode.png`,
@@ -171,7 +193,7 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     pricingFetcher.fetchPricing(),
     includeCursor && loadCursorCredentials() ? syncCursorCache() : Promise.resolve({ synced: false, rows: 0 }),
     localSources.length > 0
-      ? parseLocalSourcesAsync({ sources: localSources, since, until, year })
+      ? parseLocalSourcesAsync({ sources: localSources, since, until, year, forceTypescript: options.includeAgents })
       : Promise.resolve({ messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, processingTimeMs: 0 } as ParsedMessages),
   ]);
 
@@ -247,6 +269,54 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 3);
 
+  let topAgents: Array<{ name: string; cost: number; tokens: number; messages: number }> | undefined;
+  if (options.includeAgents && localMessages) {
+    const pricingEntries = pricingFetcher.toPricingEntries();
+    const pricingMap = new Map(pricingEntries.map(p => [p.modelId, p.pricing]));
+
+    const agentMap = new Map<string, { cost: number; tokens: number; messages: number }>();
+    for (const msg of localMessages.messages) {
+      if (msg.source === "opencode" && msg.agent) {
+        const normalizedAgent = normalizeAgentName(msg.agent);
+        const existing = agentMap.get(normalizedAgent) || { cost: 0, tokens: 0, messages: 0 };
+
+        const msgTokens = msg.input + msg.output + msg.cacheRead + msg.cacheWrite + msg.reasoning;
+        const pricing = pricingMap.get(msg.modelId);
+        let msgCost = 0;
+        if (pricing) {
+          msgCost = (msg.input * pricing.inputCostPerToken) +
+                    (msg.output * pricing.outputCostPerToken) +
+                    (msg.cacheRead * (pricing.cacheReadInputTokenCost || 0)) +
+                    (msg.cacheWrite * (pricing.cacheCreationInputTokenCost || 0));
+        }
+
+        agentMap.set(normalizedAgent, {
+          cost: existing.cost + msgCost,
+          tokens: existing.tokens + msgTokens,
+          messages: existing.messages + 1,
+        });
+      }
+    }
+
+    let agentsList = Array.from(agentMap.entries())
+      .map(([name, data]) => ({ name, ...data }));
+
+    if (options.pinSisyphus) {
+      const pinned = agentsList.filter(a => PINNED_AGENTS.includes(a.name));
+      const unpinned = agentsList.filter(a => !PINNED_AGENTS.includes(a.name));
+
+      pinned.sort((a, b) => PINNED_AGENTS.indexOf(a.name) - PINNED_AGENTS.indexOf(b.name));
+      unpinned.sort((a, b) => b.messages - a.messages);
+
+      agentsList = [...pinned, ...unpinned].slice(0, 5);
+    } else {
+      agentsList.sort((a, b) => b.messages - a.messages);
+      agentsList = agentsList.slice(0, 3);
+    }
+
+    topAgents = agentsList.length > 0 ? agentsList : undefined;
+  }
+
   const maxCost = Math.max(...graph.contributions.map(c => c.totals.cost), 1);
   const contributions = graph.contributions.map(c => ({
     date: c.date,
@@ -269,6 +339,7 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     longestStreak,
     topModels,
     topClients,
+    topAgents,
     contributions,
     totalMessages: report.totalMessages,
   };
@@ -526,7 +597,7 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-async function generateWrappedImage(data: WrappedData, options: { short?: boolean } = {}): Promise<Buffer> {
+async function generateWrappedImage(data: WrappedData, options: { short?: boolean; includeAgents?: boolean; pinSisyphus?: boolean } = {}): Promise<Buffer> {
   await ensureFontsLoaded();
   
   const canvas = createCanvas(IMAGE_WIDTH, IMAGE_HEIGHT);
@@ -576,47 +647,81 @@ async function generateWrappedImage(data: WrappedData, options: { short?: boolea
   }
   yPos += 40 * SCALE;
 
-  ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = `${20 * SCALE}px Figtree, sans-serif`;
-  ctx.fillText("Top Clients", PADDING, yPos);
-  yPos += 48 * SCALE;
-
   const logoSize = 32 * SCALE;
-  
-  for (let i = 0; i < data.topClients.length; i++) {
-    const client = data.topClients[i];
-    ctx.fillStyle = COLORS.textPrimary;
-    ctx.font = `bold ${32 * SCALE}px Figtree, sans-serif`;
-    ctx.fillText(`${i + 1}`, PADDING, yPos);
-    
-    const logoUrl = CLIENT_LOGO_URLS[client.name];
-    if (logoUrl) {
-      try {
-        const filename = `client-${client.name.toLowerCase().replace(/\s+/g, "-")}@2x.png`;
-        const logoPath = await fetchAndCacheImage(logoUrl, filename);
-        const logo = await loadImage(logoPath);
-        const logoY = yPos - logoSize + 6 * SCALE;
-        
-        const logoX = PADDING + 40 * SCALE;
-        const logoRadius = 6 * SCALE;
-        
-        ctx.save();
-        drawRoundedRect(ctx, logoX, logoY, logoSize, logoSize, logoRadius);
-        ctx.clip();
-        ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
-        ctx.restore();
-        
-        drawRoundedRect(ctx, logoX, logoY, logoSize, logoSize, logoRadius);
-        ctx.strokeStyle = "#141A25";
-        ctx.lineWidth = 1 * SCALE;
-        ctx.stroke();
-      } catch {
-      }
+
+  if (options.includeAgents) {
+    ctx.fillStyle = COLORS.textSecondary;
+    ctx.font = `${20 * SCALE}px Figtree, sans-serif`;
+    ctx.fillText("Top OpenCode Agents", PADDING, yPos);
+    yPos += 48 * SCALE;
+
+    const agents = data.topAgents || [];
+    const SISYPHUS_COLOR = "#00CED1";
+    let rankIndex = 1;
+
+    for (let i = 0; i < agents.length; i++) {
+      const agent = agents[i];
+      const isSisyphusAgent = PINNED_AGENTS.includes(agent.name);
+      const showWithDash = options.pinSisyphus && isSisyphusAgent;
+
+      ctx.fillStyle = showWithDash ? SISYPHUS_COLOR : COLORS.textPrimary;
+      ctx.font = `bold ${32 * SCALE}px Figtree, sans-serif`;
+      const prefix = showWithDash ? "•" : `${rankIndex}`;
+      ctx.fillText(prefix, PADDING, yPos);
+      if (!showWithDash) rankIndex++;
+
+      const nameX = PADDING + 40 * SCALE;
+      ctx.font = `${32 * SCALE}px Figtree, sans-serif`;
+      ctx.fillStyle = isSisyphusAgent ? SISYPHUS_COLOR : COLORS.textPrimary;
+      ctx.fillText(agent.name, nameX, yPos);
+
+      const nameWidth = ctx.measureText(agent.name).width;
+      ctx.fillStyle = COLORS.textSecondary;
+      ctx.fillText(` (${agent.messages.toLocaleString()})`, nameX + nameWidth, yPos);
+
+      yPos += 50 * SCALE;
     }
-    
-    ctx.font = `${32 * SCALE}px Figtree, sans-serif`;
-    ctx.fillText(client.name, PADDING + 40 * SCALE + logoSize + 12 * SCALE, yPos);
-    yPos += 50 * SCALE;
+  } else {
+    ctx.fillStyle = COLORS.textSecondary;
+    ctx.font = `${20 * SCALE}px Figtree, sans-serif`;
+    ctx.fillText("Top Clients", PADDING, yPos);
+    yPos += 48 * SCALE;
+
+    for (let i = 0; i < data.topClients.length; i++) {
+      const client = data.topClients[i];
+      ctx.fillStyle = COLORS.textPrimary;
+      ctx.font = `bold ${32 * SCALE}px Figtree, sans-serif`;
+      ctx.fillText(`${i + 1}`, PADDING, yPos);
+
+      const logoUrl = CLIENT_LOGO_URLS[client.name];
+      if (logoUrl) {
+        try {
+          const filename = `client-${client.name.toLowerCase().replace(/\s+/g, "-")}@2x.png`;
+          const logoPath = await fetchAndCacheImage(logoUrl, filename);
+          const logo = await loadImage(logoPath);
+          const logoY = yPos - logoSize + 6 * SCALE;
+
+          const logoX = PADDING + 40 * SCALE;
+          const logoRadius = 6 * SCALE;
+
+          ctx.save();
+          drawRoundedRect(ctx, logoX, logoY, logoSize, logoSize, logoRadius);
+          ctx.clip();
+          ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+          ctx.restore();
+
+          drawRoundedRect(ctx, logoX, logoY, logoSize, logoSize, logoRadius);
+          ctx.strokeStyle = "#141A25";
+          ctx.lineWidth = 1 * SCALE;
+          ctx.stroke();
+        } catch {
+        }
+      }
+
+      ctx.font = `${32 * SCALE}px Figtree, sans-serif`;
+      ctx.fillText(client.name, PADDING + 40 * SCALE + logoSize + 12 * SCALE, yPos);
+      yPos += 50 * SCALE;
+    }
   }
   yPos += 40 * SCALE;
 
@@ -660,11 +765,15 @@ async function generateWrappedImage(data: WrappedData, options: { short?: boolea
 
 export async function generateWrapped(options: WrappedOptions): Promise<string> {
   const data = await loadWrappedData(options);
-  const imageBuffer = await generateWrappedImage(data, { short: options.short });
-  
+  const imageBuffer = await generateWrappedImage(data, {
+    short: options.short,
+    includeAgents: options.includeAgents,
+    pinSisyphus: options.pinSisyphus,
+  });
+
   const outputPath = options.output || `tokscale-${data.year}-wrapped.png`;
   const absolutePath = path.resolve(outputPath);
-  
+
   fs.writeFileSync(absolutePath, imageBuffer);
 
   return absolutePath;

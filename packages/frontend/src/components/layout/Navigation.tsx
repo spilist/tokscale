@@ -232,9 +232,9 @@ export function Navigation() {
       <NavItemLink href="/" $isActive={isActive("/")}>
         LEADERBOARD
       </NavItemLink>
-      <NavItemLink href="/pricing" $isActive={isActive("/pricing")}>
+      {/* <NavItemLink href="/pricing" $isActive={isActive("/pricing")}>
         PRICING
-      </NavItemLink>
+      </NavItemLink> */}
       <NavItemLink href="/profile" $isActive={isActive("/profile")}>
         PROFILE
       </NavItemLink>

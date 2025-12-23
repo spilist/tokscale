@@ -53,7 +53,6 @@
       "name": "@tokscale/frontend",
       "version": "0.1.0",
       "dependencies": {
-        "@junhoyeo/blackhole": "^1.0.1",
         "@neondatabase/serverless": "^0.10.4",
         "@primer/octicons-react": "^19.21.1",
         "@primer/primitives": "^11.3.1",
@@ -417,8 +416,6 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
-
-    "@junhoyeo/blackhole": ["@junhoyeo/blackhole@1.0.2", "", { "peerDependencies": { "react": ">=18", "react-dom": ">=18", "three": ">=0.150.0" } }, "sha512-ZC5a88cmkk809g6WclvjROehqcvlhfSBqhaTKQarAh411zlZC/O1fXOLCtFursERTHstX8aQ0OPN+Ps5Ped53g=="],
 
     "@lit-labs/react": ["@lit-labs/react@1.2.1", "", {}, "sha512-DiZdJYFU0tBbdQkfwwRSwYyI/mcWkg3sWesKRsHUd4G+NekTmmeq9fzsurvcKTNVa0comNljwtg4Hvi1ds3V+A=="],
 

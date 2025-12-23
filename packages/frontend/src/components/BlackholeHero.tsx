@@ -21,10 +21,13 @@ export function BlackholeHero() {
         <HeroBgImage
           src={heroBg}
           alt=""
-          fill
+          width={3000}
+          height={940}
           priority
           quality={100}
+          unoptimized
           placeholder="blur"
+          style={{ width: "100%", height: "100%", backgroundColor: "black" }}
         />
       </BackgroundWrapper>
 

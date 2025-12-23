@@ -64,7 +64,7 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   cursor: "Cursor IDE",
 };
 
-const ASSETS_BASE_URL = "https://tokscale.ai/assets";
+const ASSETS_BASE_URL = "https://tokscale.ai/assets/logos";
 
 const PINNED_AGENTS = ["Sisyphus", "Planner-Sisyphus"];
 
@@ -86,18 +86,19 @@ function normalizeAgentName(agent: string): string {
 }
 
 const CLIENT_LOGO_URLS: Record<string, string> = {
-  "OpenCode": `${ASSETS_BASE_URL}/client-opencode.png`,
-  "Claude Code": `${ASSETS_BASE_URL}/client-claude.jpg`,
-  "Codex CLI": `${ASSETS_BASE_URL}/client-openai.jpg`,
-  "Gemini CLI": `${ASSETS_BASE_URL}/client-gemini.png`,
-  "Cursor IDE": `${ASSETS_BASE_URL}/client-cursor.jpg`,
+  "OpenCode": `${ASSETS_BASE_URL}/opencode.png`,
+  "Claude Code": `${ASSETS_BASE_URL}/claude.jpg`,
+  "Codex CLI": `${ASSETS_BASE_URL}/openai.jpg`,
+  "Gemini CLI": `${ASSETS_BASE_URL}/gemini.png`,
+  "Cursor IDE": `${ASSETS_BASE_URL}/cursor.jpg`,
 };
 
 const PROVIDER_LOGO_URLS: Record<string, string> = {
-  "anthropic": `${ASSETS_BASE_URL}/client-claude.jpg`,
-  "openai": `${ASSETS_BASE_URL}/client-openai.jpg`,
-  "google": `${ASSETS_BASE_URL}/client-gemini.png`,
+  "anthropic": `${ASSETS_BASE_URL}/claude.jpg`,
+  "openai": `${ASSETS_BASE_URL}/openai.jpg`,
+  "google": `${ASSETS_BASE_URL}/gemini.png`,
   "xai": `${ASSETS_BASE_URL}/grok.jpg`,
+  "zai": `${ASSETS_BASE_URL}/zai.jpg`,
 };
 
 function getProviderFromModel(modelId: string): string | null {
@@ -113,6 +114,9 @@ function getProviderFromModel(modelId: string): string | null {
   }
   if (lower.includes("grok")) {
     return "xai";
+  }
+  if (lower.includes("glm") || lower.includes("pickle")) {
+    return "zai";
   }
   return null;
 }

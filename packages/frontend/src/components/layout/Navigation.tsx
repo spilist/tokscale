@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import styled, { keyframes } from "styled-components";
+import styled, { css, keyframes } from "styled-components";
 import { Avatar, ActionMenu, ActionList } from "@primer/react";
 import { PersonIcon, GearIcon, SignOutIcon } from "@primer/octicons-react";
 
@@ -91,12 +91,12 @@ const NavItemLink = styled(Link)<{ $isActive: boolean }>`
   
   ${({ $isActive }) =>
     $isActive
-      ? `
+      ? css`
     background: rgba(235, 242, 245, 0.96);
     border: 1px solid rgba(235, 242, 245, 0.96);
     color: #000000;
   `
-      : `
+      : css`
     background: transparent;
     border: 1px solid transparent;
     color: #D9D9D9;
@@ -115,8 +115,6 @@ const LoadingSkeleton = styled.div`
   background-color: rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
 `;
-
-
 
 const UserInfoContainer = styled.div`
   padding-left: 12px;
@@ -225,17 +223,12 @@ export function Navigation() {
       });
   }, []);
 
-  const isActive = (path: string) => pathname === path;
-
   return (
     <NavContainer aria-label="Main navigation">
-      <NavItemLink href="/" $isActive={isActive("/")}>
+      <NavItemLink href="/" $isActive={pathname === "/"}>
         LEADERBOARD
       </NavItemLink>
-      {/* <NavItemLink href="/pricing" $isActive={isActive("/pricing")}>
-        PRICING
-      </NavItemLink> */}
-      <NavItemLink href="/profile" $isActive={isActive("/profile")}>
+      <NavItemLink href="/profile" $isActive={pathname === "/profile" || pathname.startsWith("/u/")}>
         PROFILE
       </NavItemLink>
       <NavItemBase

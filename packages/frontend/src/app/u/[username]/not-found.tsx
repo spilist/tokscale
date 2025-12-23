@@ -45,7 +45,7 @@ const BackButton = styled(Link)`
   color: white;
   font-weight: 500;
   border-radius: 8px;
-  background-color: #53d1f3;
+  background: #0073FF;
   transition: opacity 0.2s;
 
   &:hover {

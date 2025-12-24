@@ -37,6 +37,12 @@ const NavContainer = styled.nav`
   align-items: center;
   gap: 4px;
   z-index: 50;
+  
+  @media (max-width: 767px) {
+    width: calc(100% - 24px);
+    max-width: 100%;
+    gap: 2px;
+  }
 `;
 
 const NavItemBase = styled.a<{ $isActive: boolean }>`
@@ -54,6 +60,18 @@ const NavItemBase = styled.a<{ $isActive: boolean }>`
   text-decoration: none;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 0;
+  
+  @media (max-width: 767px) {
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+  
+  @media (max-width: 374px) {
+    font-size: 10px;
+    padding: 8px 6px;
+  }
   
   ${({ $isActive }) =>
     $isActive
@@ -88,6 +106,18 @@ const NavItemLink = styled(Link)<{ $isActive: boolean }>`
   text-decoration: none;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 0;
+  
+  @media (max-width: 767px) {
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+  
+  @media (max-width: 374px) {
+    font-size: 10px;
+    padding: 8px 6px;
+  }
   
   ${({ $isActive }) =>
     $isActive
@@ -150,6 +180,11 @@ const SignInButton = styled.a`
   
   &:hover {
     opacity: 0.9;
+  }
+  
+  @media (max-width: 374px) {
+    padding: 6px;
+    gap: 4px;
   }
 `;
 

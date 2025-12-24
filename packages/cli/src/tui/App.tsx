@@ -1,4 +1,4 @@
-import { createSignal, Switch, Match, onCleanup } from "solid-js";
+import { createEffect, createSignal, Switch, Match, onCleanup } from "solid-js";
 import { useKeyboard, useTerminalDimensions, useRenderer } from "@opentui/solid";
 import clipboardy from "clipboardy";
 import { Header } from "./components/Header.js";
@@ -61,6 +61,8 @@ export function App(props: AppProps) {
 
   const [statusMessage, setStatusMessage] = createSignal<string | null>(null);
   let statusTimeout: ReturnType<typeof setTimeout> | null = null;
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = createSignal(settings.autoRefreshEnabled ?? false);
+  const [autoRefreshMs, setAutoRefreshMs] = createSignal(settings.autoRefreshMs ?? 60000);
 
   const showStatus = (msg: string, duration = 2000) => {
     if (statusTimeout) clearTimeout(statusTimeout);
@@ -70,6 +72,68 @@ export function App(props: AppProps) {
 
   onCleanup(() => {
     if (statusTimeout) clearTimeout(statusTimeout);
+  });
+
+  const MIN_AUTO_REFRESH_MS = 30000;
+  const MAX_AUTO_REFRESH_MS = 3600000;
+  const AUTO_REFRESH_STEPS_MS = [
+    30000,
+    60000,
+    120000,
+    300000,
+    600000,
+  ];
+  const AUTO_REFRESH_AFTER_MAX_STEP_MS = 600000;
+
+  const clampAutoRefresh = (value: number) =>
+    Math.min(MAX_AUTO_REFRESH_MS, Math.max(MIN_AUTO_REFRESH_MS, value));
+
+  const formatIntervalSeconds = (ms: number) => {
+    const seconds = Math.round(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.round(seconds / 60);
+    return `${minutes}m`;
+  };
+
+  const getAutoRefreshIntervalStep = (current: number, direction: "up" | "down") => {
+    const value = clampAutoRefresh(current);
+    const cappedSteps = AUTO_REFRESH_STEPS_MS;
+    const maxStep = cappedSteps[cappedSteps.length - 1];
+
+    if (value > maxStep) {
+      const delta = direction === "up" ? AUTO_REFRESH_AFTER_MAX_STEP_MS : -AUTO_REFRESH_AFTER_MAX_STEP_MS;
+      return clampAutoRefresh(value + delta);
+    }
+
+    if (value === maxStep && direction === "up") {
+      return clampAutoRefresh(value + AUTO_REFRESH_AFTER_MAX_STEP_MS);
+    }
+
+    if (value === maxStep && direction === "down") {
+      return cappedSteps[cappedSteps.length - 2];
+    }
+
+    let idx = cappedSteps.findIndex((step) => step >= value);
+    if (idx === -1) idx = cappedSteps.length - 1;
+
+    if (direction === "up") {
+      const nextIndex = value === cappedSteps[idx] ? idx + 1 : idx;
+      return clampAutoRefresh(cappedSteps[Math.min(nextIndex, cappedSteps.length - 1)]);
+    }
+
+    const prevIndex = value === cappedSteps[idx] ? idx - 1 : idx - 1;
+    return clampAutoRefresh(cappedSteps[Math.max(prevIndex, 0)]);
+  };
+
+  createEffect(() => {
+    if (!autoRefreshEnabled()) return;
+    const ms = autoRefreshMs();
+    const interval = setInterval(() => {
+      if (!loading() && !isRefreshing()) {
+        refresh();
+      }
+    }, ms);
+    onCleanup(() => clearInterval(interval));
   });
 
   const contentHeight = () => Math.max(rows() - 4, 12);
@@ -105,6 +169,30 @@ export function App(props: AppProps) {
   useKeyboard((key) => {
     if (key.name === "q") {
       renderer.destroy();
+      return;
+    }
+
+    if (key.name === "r" && key.shift) {
+      const next = !autoRefreshEnabled();
+      setAutoRefreshEnabled(next);
+      saveSettings({ autoRefreshEnabled: next });
+      showStatus(`Auto update: ${next ? "ON" : "OFF"} (${formatIntervalSeconds(autoRefreshMs())})`);
+      return;
+    }
+
+    if ((key.name === "+") || (key.name === "=" && key.shift)) {
+      const next = getAutoRefreshIntervalStep(autoRefreshMs(), "up");
+      setAutoRefreshMs(next);
+      saveSettings({ autoRefreshMs: next });
+      showStatus(`Auto update interval: ${formatIntervalSeconds(next)}`);
+      return;
+    }
+
+    if (key.name === "-" || key.name === "_") {
+      const next = getAutoRefreshIntervalStep(autoRefreshMs(), "down");
+      setAutoRefreshMs(next);
+      saveSettings({ autoRefreshMs: next });
+      showStatus(`Auto update interval: ${formatIntervalSeconds(next)}`);
       return;
     }
 
@@ -328,6 +416,8 @@ export function App(props: AppProps) {
         isRefreshing={isRefreshing()}
         loadingPhase={loadingPhase()}
         cacheTimestamp={cacheTimestamp()}
+        autoRefreshEnabled={autoRefreshEnabled()}
+        autoRefreshMs={autoRefreshMs()}
         width={columns()}
         onSourceToggle={handleSourceToggle}
         onSortChange={handleSortChange}

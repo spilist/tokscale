@@ -9,9 +9,36 @@ const CONFIG_FILE = join(CONFIG_DIR, "tui-settings.json");
 const CACHE_FILE = join(CACHE_DIR, "tui-data-cache.json");
 
 const CACHE_STALE_THRESHOLD_MS = 60 * 1000;
+const MIN_AUTO_REFRESH_MS = 30000;
+const MAX_AUTO_REFRESH_MS = 3600000;
+const DEFAULT_AUTO_REFRESH_MS = 60000;
 
 interface TUISettings {
   colorPalette: string;
+  autoRefreshEnabled?: boolean;
+  autoRefreshMs?: number;
+}
+
+function validateSettings(raw: unknown): TUISettings {
+  const defaults: TUISettings = { 
+    colorPalette: "green", 
+    autoRefreshEnabled: false, 
+    autoRefreshMs: DEFAULT_AUTO_REFRESH_MS 
+  };
+  
+  if (!raw || typeof raw !== "object") return defaults;
+  
+  const obj = raw as Record<string, unknown>;
+  
+  const colorPalette = typeof obj.colorPalette === "string" ? obj.colorPalette : defaults.colorPalette;
+  const autoRefreshEnabled = typeof obj.autoRefreshEnabled === "boolean" ? obj.autoRefreshEnabled : defaults.autoRefreshEnabled;
+  
+  let autoRefreshMs = defaults.autoRefreshMs;
+  if (typeof obj.autoRefreshMs === "number" && Number.isFinite(obj.autoRefreshMs)) {
+    autoRefreshMs = Math.min(MAX_AUTO_REFRESH_MS, Math.max(MIN_AUTO_REFRESH_MS, obj.autoRefreshMs));
+  }
+  
+  return { colorPalette, autoRefreshEnabled, autoRefreshMs };
 }
 
 interface CachedTUIData {
@@ -25,18 +52,24 @@ interface CachedTUIData {
 export function loadSettings(): TUISettings {
   try {
     if (existsSync(CONFIG_FILE)) {
-      return JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
+      const raw = JSON.parse(readFileSync(CONFIG_FILE, "utf-8"));
+      return validateSettings(raw);
     }
   } catch {
   }
-  return { colorPalette: "green" };
+  return { colorPalette: "green", autoRefreshEnabled: false, autoRefreshMs: DEFAULT_AUTO_REFRESH_MS };
 }
 
-export function saveSettings(settings: TUISettings): void {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+export function saveSettings(updates: Partial<TUISettings>): void {
+  try {
+    if (!existsSync(CONFIG_DIR)) {
+      mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+    const current = loadSettings();
+    const merged = { ...current, ...updates };
+    writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2));
+  } catch {
   }
-  writeFileSync(CONFIG_FILE, JSON.stringify(settings, null, 2));
 }
 
 function sourcesMatch(enabledSources: Set<string>, cachedSources: string[]): boolean {

@@ -452,13 +452,21 @@ export function useData(enabledSources: Accessor<Set<SourceType>>, dateFilters?:
   const [isRefreshing, setIsRefreshing] = createSignal(initialCachedData ? initialCacheIsStale : false);
 
   const [forceRefresh, setForceRefresh] = createSignal(false);
+  let pendingRefresh = false;
+  let currentRequestId = 0;
 
   const refresh = () => {
+    if (isRefreshing() || loading()) {
+      pendingRefresh = true;
+      return;
+    }
+    setIsRefreshing(true);
     setForceRefresh(true);
     setRefreshTrigger(prev => prev + 1);
   };
 
   const doLoad = (sources: Set<SourceType>, skipCacheCheck = false) => {
+    ++currentRequestId; // Invalidate any in-flight requests immediately
     const shouldSkipCache = skipCacheCheck || forceRefresh();
     
     if (!shouldSkipCache) {
@@ -488,17 +496,27 @@ export function useData(enabledSources: Accessor<Set<SourceType>>, dateFilters?:
       setForceRefresh(false);
     }
     
+    const requestId = currentRequestId;
     setError(null);
     loadData(sources, dateFilters)
       .then((freshData) => {
+        if (requestId !== currentRequestId) return;
         setData(freshData);
         saveCachedData(freshData, sources);
       })
-      .catch((e) => setError(e.message))
+      .catch((e: unknown) => {
+        if (requestId !== currentRequestId) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
       .finally(() => {
+        if (requestId !== currentRequestId) return;
         setLoading(false);
         setIsRefreshing(false);
         setLoadingPhase("complete");
+        if (pendingRefresh) {
+          pendingRefresh = false;
+          refresh();
+        }
       });
   };
 

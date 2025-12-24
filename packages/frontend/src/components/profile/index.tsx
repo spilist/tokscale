@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import styled, { css } from "styled-components";
+import { toast } from "react-toastify";
 import { GraphContainer } from "@/components/GraphContainer";
 import type { TokenContributionData } from "@/lib/types";
 import { formatNumber, formatCurrency } from "@/lib/utils";
@@ -232,6 +233,15 @@ const ActionText = styled.span`
 export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) {
   const avatarUrl = user.avatarUrl || `https://github.com/${user.username}.png`;
 
+  const handleShareClick = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link copied to clipboard!");
+    } catch (error) {
+      toast.error("Failed to copy link");
+    }
+  };
+
   return (
     <HeaderContainer
       style={{ backgroundColor: "#141A21", borderColor: "var(--color-border-default)" }}
@@ -331,6 +341,7 @@ export function ProfileHeader({ user, stats, lastUpdated }: ProfileHeaderProps) 
 
         <ActionButtons>
           <ActionButton
+            onClick={handleShareClick}
             aria-label={`Share ${user.displayName || user.username}'s profile`}
             style={{ backgroundColor: "var(--color-btn-bg)", borderColor: "var(--color-border-default)" }}
           >

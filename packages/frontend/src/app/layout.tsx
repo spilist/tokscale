@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono, Figtree } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
+import { ToastContainer } from "react-toastify";
 import { Providers } from "@/lib/providers";
 import "./globals.css";
+import "react-toastify/dist/ReactToastify.css";
 
 const figtree = Figtree({
   variable: "--font-figtree",
@@ -51,6 +53,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Providers>
           {children}
         </Providers>
+        <ToastContainer position="top-right" />
       </body>
     </html>
   );

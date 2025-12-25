@@ -390,7 +390,7 @@ Submitted data goes through Level 1 validation:
 
 Generate a beautiful year-in-review image summarizing your AI coding assistant usage—inspired by Spotify Wrapped.
 
-| `tokscale wrapped` | `tokscale wrapped --agents` | `tokscale wrapped --agents --pin-sisyphus` |
+| `bunx tokscale@latest wrapped` | `bunx tokscale@latest wrapped --agents` | `bunx tokscale@latest wrapped --agents --pin-sisyphus` |
 |:---:|:---:|:---:|
 | ![Wrapped 2025](.github/assets/wrapped-2025.png) | ![Wrapped 2025 (Agents)](.github/assets/wrapped-2025-agents.png) | ![Wrapped 2025 (Agents + Pin Sisyphus)](.github/assets/wrapped-2025-agents-pin-sisyphus.png) |
 

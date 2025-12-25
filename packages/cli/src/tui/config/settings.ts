@@ -21,7 +21,7 @@ interface TUISettings {
 
 function validateSettings(raw: unknown): TUISettings {
   const defaults: TUISettings = { 
-    colorPalette: "green", 
+    colorPalette: "blue", 
     autoRefreshEnabled: false, 
     autoRefreshMs: DEFAULT_AUTO_REFRESH_MS 
   };
@@ -57,7 +57,7 @@ export function loadSettings(): TUISettings {
     }
   } catch {
   }
-  return { colorPalette: "green", autoRefreshEnabled: false, autoRefreshMs: DEFAULT_AUTO_REFRESH_MS };
+  return { colorPalette: "blue", autoRefreshEnabled: false, autoRefreshMs: DEFAULT_AUTO_REFRESH_MS };
 }
 
 export function saveSettings(updates: Partial<TUISettings>): void {

@@ -305,8 +305,9 @@ async function main() {
     .option("--cursor", "Include only Cursor IDE data")
     .option("--no-spinner", "Disable loading spinner (for scripting)")
     .option("--short", "Display total tokens in abbreviated format (e.g., 7.14B)")
-    .option("--agents", "Show Top OpenCode Agents instead of Top Clients")
-    .option("--pin-sisyphus", "Pin Sisyphus and Planner-Sisyphus at top of agents list")
+    .option("--agents", "Show Top OpenCode Agents (default)")
+    .option("--clients", "Show Top Clients instead of Top OpenCode Agents")
+    .option("--disable-pinned", "Disable pinning of Sisyphus agents in rankings")
     .action(async (options) => {
       await handleWrappedCommand(options);
     });
@@ -929,7 +930,8 @@ interface WrappedCommandOptions extends FilterOptions {
   spinner?: boolean;
   short?: boolean;
   agents?: boolean;
-  pinSisyphus?: boolean;
+  clients?: boolean;
+  disablePinned?: boolean;
 }
 
 async function handleWrappedCommand(options: WrappedCommandOptions) {
@@ -946,8 +948,8 @@ async function handleWrappedCommand(options: WrappedCommandOptions) {
       year,
       sources: enabledSources,
       short: options.short,
-      includeAgents: options.agents,
-      pinSisyphus: options.pinSisyphus,
+      includeAgents: !options.clients,
+      pinSisyphus: !options.disablePinned,
     });
 
     spinner?.stop();

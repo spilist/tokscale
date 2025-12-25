@@ -1,6 +1,7 @@
 import { For, Show, createMemo, createSignal } from "solid-js";
 import type { TUIData } from "../hooks/useData.js";
 import type { ColorPaletteName } from "../config/themes.js";
+import type { SortType, GridCell } from "../types/index.js";
 import { getPalette, getGradeColor } from "../config/themes.js";
 import { getModelColor } from "../utils/colors.js";
 import { formatTokens } from "../utils/format.js";
@@ -13,6 +14,8 @@ interface StatsViewProps {
   colorPalette: ColorPaletteName;
   width?: number;
   selectedDate?: string | null;
+  sortBy?: SortType;
+  onSortChange?: (sort: SortType) => void;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -24,11 +27,41 @@ interface MonthLabel {
   weekIndex: number;
 }
 
+function MetricButton(props: { label: string; metric: SortType; active: boolean; onClick?: (m: SortType) => void }) {
+  return (
+    <box onMouseDown={() => props.onClick?.(props.metric)}>
+      <text fg={props.active ? "white" : "gray"} bold={props.active}>{props.label}</text>
+    </box>
+  );
+}
+
 export function StatsView(props: StatsViewProps) {
   const palette = () => getPalette(props.colorPalette);
   const isNarrowTerminal = () => isNarrow(props.width);
-  const grid = () => props.data.contributionGrid;
+  const metric = () => props.sortBy ?? "tokens";
   const cellWidth = 2;
+
+  const grid = createMemo((): GridCell[][] => {
+    const contributions = props.data.contributions;
+    const baseGrid = props.data.contributionGrid;
+    
+    const values = contributions.map(c => metric() === "tokens" ? c.tokens : c.cost);
+    const maxValue = Math.max(1, ...values);
+    
+    const levelMap = new Map<string, number>();
+    for (const c of contributions) {
+      const value = metric() === "tokens" ? c.tokens : c.cost;
+      const level = value === 0 ? 0 : Math.min(4, Math.ceil((value / maxValue) * 4));
+      levelMap.set(c.date, level);
+    }
+    
+    return baseGrid.map(row => 
+      row.map(cell => ({
+        date: cell.date,
+        level: cell.date ? (levelMap.get(cell.date) ?? 0) : 0,
+      }))
+    );
+  });
   
   const [clickedCell, setClickedCell] = createSignal<string | null>(null);
   
@@ -156,6 +189,9 @@ export function StatsView(props: StatsViewProps) {
           </For>
         </box>
         <text dim>More</text>
+        <text dim>|</text>
+        <MetricButton label="Tokens" metric="tokens" active={metric() === "tokens"} onClick={props.onSortChange} />
+        <MetricButton label="Cost" metric="cost" active={metric() === "cost"} onClick={props.onSortChange} />
         <Show when={!isNarrowTerminal()}>
           <text dim>|</text>
           <text dim>Click on a day to see breakdown</text>

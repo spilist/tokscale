@@ -843,7 +843,8 @@ export async function generateWrapped(options: WrappedOptions): Promise<string> 
 
   if (agentsRequested && opencodeEnabled && !hasAgentData) {
     console.warn(pc.yellow(`\n  ⚠ No OpenCode agent data found for ${data.year}.`));
-    console.warn(pc.gray("    Falling back to clients view.\n"));
+    console.warn(pc.gray("    Falling back to clients view."));
+    console.warn(pc.gray("    Use --clients to always show clients view.\n"));
   }
 
   const imageBuffer = await generateWrappedImage(data, {

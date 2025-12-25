@@ -222,7 +222,7 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     pricingFetcher.fetchPricing(),
     includeCursor && loadCursorCredentials() ? syncCursorCache() : Promise.resolve({ synced: false, rows: 0 }),
     localSources.length > 0
-      ? parseLocalSourcesAsync({ sources: localSources, since, until, year, forceTypescript: options.includeAgents })
+      ? parseLocalSourcesAsync({ sources: localSources, since, until, year, forceTypescript: options.includeAgents !== false })
       : Promise.resolve({ messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, processingTimeMs: 0 } as ParsedMessages),
   ]);
 
@@ -299,7 +299,7 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     .slice(0, 3);
 
   let topAgents: Array<{ name: string; cost: number; tokens: number; messages: number }> | undefined;
-  if (options.includeAgents && localMessages) {
+  if (options.includeAgents !== false && localMessages) {
     const pricingEntries = pricingFetcher.toPricingEntries();
     const pricingMap = new Map(pricingEntries.map(p => [p.modelId, p.pricing]));
 
@@ -330,7 +330,7 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     let agentsList = Array.from(agentMap.entries())
       .map(([name, data]) => ({ name, ...data }));
 
-    if (options.pinSisyphus) {
+    if (options.pinSisyphus !== false) {
       const pinned = agentsList.filter(a => PINNED_AGENTS.includes(a.name));
       const unpinned = agentsList.filter(a => !PINNED_AGENTS.includes(a.name));
 
@@ -718,7 +718,7 @@ async function generateWrappedImage(data: WrappedData, options: { short?: boolea
   }
   yPos += 40 * SCALE;
 
-  if (options.includeAgents) {
+  if (options.includeAgents !== false) {
     ctx.fillStyle = COLORS.textSecondary;
     ctx.font = `${20 * SCALE}px Figtree, sans-serif`;
     ctx.fillText("Top OpenCode Agents", PADDING, yPos);
@@ -731,7 +731,7 @@ async function generateWrappedImage(data: WrappedData, options: { short?: boolea
     for (let i = 0; i < agents.length; i++) {
       const agent = agents[i];
       const isSisyphusAgent = PINNED_AGENTS.includes(agent.name);
-      const showWithDash = options.pinSisyphus && isSisyphusAgent;
+      const showWithDash = options.pinSisyphus !== false && isSisyphusAgent;
 
       ctx.fillStyle = showWithDash ? SISYPHUS_COLOR : COLORS.textPrimary;
       ctx.font = `bold ${32 * SCALE}px Figtree, sans-serif`;

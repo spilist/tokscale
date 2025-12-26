@@ -41,6 +41,7 @@ interface NativeScanStats {
   claudeFiles: number;
   codexFiles: number;
   geminiFiles: number;
+  ampFiles: number;
   totalFiles: number;
 }
 
@@ -192,6 +193,7 @@ interface NativeParsedMessages {
   claudeCount: number;
   codexCount: number;
   geminiCount: number;
+  ampCount: number;
   processingTimeMs: number;
 }
 

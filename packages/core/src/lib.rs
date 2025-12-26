@@ -628,6 +628,29 @@ fn parse_all_messages_with_pricing(
         .collect();
     all_messages.extend(cursor_messages);
 
+    // Parse Amp files in parallel
+    let amp_messages: Vec<UnifiedMessage> = scan_result
+        .amp_files
+        .par_iter()
+        .flat_map(|path| {
+            sessions::amp::parse_amp_file(path)
+                .into_iter()
+                .map(|mut msg| {
+                    msg.cost = pricing_data.calculate_cost(
+                        &msg.model_id,
+                        msg.tokens.input,
+                        msg.tokens.output,
+                        msg.tokens.cache_read,
+                        msg.tokens.cache_write,
+                        msg.tokens.reasoning,
+                    );
+                    msg
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    all_messages.extend(amp_messages);
+
     all_messages
 }
 

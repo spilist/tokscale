@@ -22,7 +22,7 @@ export interface UnifiedMessage {
   agent?: string;
 }
 
-export type SourceType = "opencode" | "claude" | "codex" | "gemini" | "cursor";
+export type SourceType = "opencode" | "claude" | "codex" | "gemini" | "cursor" | "amp";
 
 /**
  * Convert Unix milliseconds timestamp to YYYY-MM-DD date string

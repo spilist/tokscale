@@ -11,12 +11,14 @@ export { parseOpenCodeMessages, getOpenCodeStoragePath } from "./opencode.js";
 export { parseClaudeCodeMessages, getClaudeCodeProjectsPath } from "./claudecode.js";
 export { parseCodexMessages, getCodexSessionsPath } from "./codex.js";
 export { parseGeminiMessages, getGeminiBasePath } from "./gemini.js";
+export { parseAmpMessages, getAmpThreadsPath } from "./amp.js";
 
 import type { UnifiedMessage, SourceType } from "./types.js";
 import { parseOpenCodeMessages } from "./opencode.js";
 import { parseClaudeCodeMessages } from "./claudecode.js";
 import { parseCodexMessages } from "./codex.js";
 import { parseGeminiMessages } from "./gemini.js";
+import { parseAmpMessages } from "./amp.js";
 
 export interface ParsedMessages {
   messages: UnifiedMessage[];
@@ -24,6 +26,7 @@ export interface ParsedMessages {
   claudeCount: number;
   codexCount: number;
   geminiCount: number;
+  ampCount: number;
   processingTimeMs: number;
 }
 
@@ -68,6 +71,7 @@ export function parseLocalSources(options: ParseOptions = {}): ParsedMessages {
   let claudeCount = 0;
   let codexCount = 0;
   let geminiCount = 0;
+  let ampCount = 0;
 
   // Parse OpenCode
   if (!sources || sources.includes("opencode")) {
@@ -113,6 +117,17 @@ export function parseLocalSources(options: ParseOptions = {}): ParsedMessages {
     }
   }
 
+  // Parse Amp
+  if (!sources || sources.includes("amp")) {
+    const messages = parseAmpMessages();
+    for (const msg of messages) {
+      if (isDateInRange(msg.date, options.since, options.until, options.year)) {
+        allMessages.push(msg);
+        ampCount++;
+      }
+    }
+  }
+
   const processingTimeMs = performance.now() - startTime;
 
   return {
@@ -121,6 +136,7 @@ export function parseLocalSources(options: ParseOptions = {}): ParsedMessages {
     claudeCount,
     codexCount,
     geminiCount,
+    ampCount,
     processingTimeMs,
   };
 }

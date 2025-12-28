@@ -891,4 +891,57 @@ describe('POST /api/submit - Source-Level Merge', () => {
       expect(afterB.cursor.devices?.[deviceB]).toBeUndefined();
     });
   });
+
+  describe('modelId Migration Tests', () => {
+    it('should migrate legacy data with only modelId to __legacy__ device with correct model breakdown', () => {
+      const existing: Record<string, SourceBreakdownData> = {
+        claude: {
+          tokens: 1000, cost: 0.05, input: 500, output: 500,
+          cacheRead: 0, cacheWrite: 0, reasoning: 0, messages: 10,
+          models: undefined as unknown as Record<string, any>,
+          modelId: 'claude-sonnet-4'
+        }
+      };
+      
+      const incoming: Record<string, SourceBreakdownData> = {
+        claude: {
+          tokens: 500, cost: 0.02, input: 250, output: 250,
+          cacheRead: 0, cacheWrite: 0, reasoning: 0, messages: 5,
+          models: {}
+        }
+      };
+      
+      const result = mergeSourceBreakdowns(existing, incoming, new Set(['claude']), 'device-1');
+      
+      // Verify __legacy__ device was created with model breakdown from modelId
+      expect(result.claude.devices?.['__legacy__']?.models['claude-sonnet-4']).toBeDefined();
+      expect(result.claude.devices?.['__legacy__']?.models['claude-sonnet-4']?.tokens).toBe(1000);
+      expect(result.claude.devices?.['__legacy__']?.models['claude-sonnet-4']?.cost).toBe(0.05);
+    });
+
+    it('should handle legacy data with EMPTY models object and modelId (falls back to modelId)', () => {
+      const existing: Record<string, SourceBreakdownData> = {
+        claude: {
+          tokens: 1000, cost: 0.05, input: 500, output: 500,
+          cacheRead: 0, cacheWrite: 0, reasoning: 0, messages: 10,
+          models: {},  // Empty object - should fall back to modelId
+          modelId: 'claude-sonnet-4'
+        }
+      };
+      
+      const incoming: Record<string, SourceBreakdownData> = {
+        claude: {
+          tokens: 500, cost: 0.02, input: 250, output: 250,
+          cacheRead: 0, cacheWrite: 0, reasoning: 0, messages: 5,
+          models: {}
+        }
+      };
+      
+      const result = mergeSourceBreakdowns(existing, incoming, new Set(['claude']), 'device-1');
+      
+      // Should use modelId since models is empty
+      expect(result.claude.devices?.['__legacy__']?.models['claude-sonnet-4']).toBeDefined();
+      expect(result.claude.devices?.['__legacy__']?.models['claude-sonnet-4']?.tokens).toBe(1000);
+    });
+  });
 });

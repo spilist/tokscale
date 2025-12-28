@@ -171,6 +171,27 @@ export function mergeSourceBreakdowns(
       // MIGRATION: If existing source has NO devices field (legacy data)
       // Use "__legacy__" device to preserve historical data separately from current device
       if (!merged[sourceName].devices) {
+        // Check for NON-EMPTY models (empty {} is truthy but should fall back to modelId)
+        const hasModels = merged[sourceName].models && 
+                          Object.keys(merged[sourceName].models).length > 0;
+
+        const legacyModels: Record<string, ModelBreakdownData> = hasModels
+          ? { ...merged[sourceName].models }
+          : merged[sourceName].modelId?.trim()  // Normalize empty strings
+            ? {
+                [merged[sourceName].modelId!]: {
+                  tokens: merged[sourceName].tokens,
+                  cost: merged[sourceName].cost,
+                  input: merged[sourceName].input,
+                  output: merged[sourceName].output,
+                  cacheRead: merged[sourceName].cacheRead,
+                  cacheWrite: merged[sourceName].cacheWrite,
+                  reasoning: merged[sourceName].reasoning || 0,
+                  messages: merged[sourceName].messages,
+                },
+              }
+            : {};
+
         merged[sourceName].devices = {
           "__legacy__": {
             tokens: merged[sourceName].tokens,
@@ -181,7 +202,7 @@ export function mergeSourceBreakdowns(
             cacheWrite: merged[sourceName].cacheWrite,
             reasoning: merged[sourceName].reasoning || 0,
             messages: merged[sourceName].messages,
-            models: { ...(merged[sourceName].models ?? {}) },
+            models: legacyModels,
           },
         };
       }

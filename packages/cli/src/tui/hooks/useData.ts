@@ -20,7 +20,7 @@ import {
   finalizeGraphAsync,
   type ParsedMessages,
 } from "../../native.js";
-import { PricingFetcher } from "../../pricing/index.js";
+import { PricingFetcher } from "../../pricing-stub.js";
 import { syncCursorCache, loadCursorCredentials } from "../../cursor.js";
 import { getModelColor } from "../utils/colors.js";
 import { loadCachedData, saveCachedData, isCacheStale } from "../config/settings.js";

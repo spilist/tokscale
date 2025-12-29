@@ -10,7 +10,6 @@ import {
   finalizeGraphAsync,
   type ParsedMessages,
 } from "./native.js";
-import { PricingFetcher } from "./pricing/index.js";
 import { syncCursorCache, loadCursorCredentials } from "./cursor.js";
 import { loadCredentials } from "./credentials.js";
 import type { SourceType } from "./graph-types.js";
@@ -219,21 +218,18 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
   const since = `${year}-01-01`;
   const until = `${year}-12-31`;
 
-  const pricingFetcher = new PricingFetcher();
-  
   const phase1Results = await Promise.allSettled([
-    pricingFetcher.fetchPricing(),
     includeCursor && loadCursorCredentials() ? syncCursorCache() : Promise.resolve({ synced: false, rows: 0 }),
     localSources.length > 0
-      ? parseLocalSourcesAsync({ sources: localSources, since, until, year, forceTypescript: options.includeAgents !== false })
+      ? parseLocalSourcesAsync({ sources: localSources, since, until, year })
       : Promise.resolve({ messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, ampCount: 0, droidCount: 0, processingTimeMs: 0 } as ParsedMessages),
   ]);
 
-  const cursorSync = phase1Results[1].status === "fulfilled" 
-    ? phase1Results[1].value 
+  const cursorSync = phase1Results[0].status === "fulfilled" 
+    ? phase1Results[0].value 
     : { synced: false, rows: 0 };
-  const localMessages = phase1Results[2].status === "fulfilled" 
-    ? phase1Results[2].value 
+  const localMessages = phase1Results[1].status === "fulfilled" 
+    ? phase1Results[1].value 
     : null;
 
   const emptyMessages: ParsedMessages = {
@@ -250,7 +246,7 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
   const [reportResult, graphResult] = await Promise.allSettled([
     finalizeReportAsync({
       localMessages: localMessages || emptyMessages,
-      pricing: pricingFetcher.toPricingEntries(),
+      pricing: [],
       includeCursor: includeCursor && cursorSync.synced,
       since,
       until,
@@ -258,7 +254,7 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     }),
     finalizeGraphAsync({
       localMessages: localMessages || emptyMessages,
-      pricing: pricingFetcher.toPricingEntries(),
+      pricing: [],
       includeCursor: includeCursor && cursorSync.synced,
       since,
       until,
@@ -305,9 +301,6 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
 
   let topAgents: Array<{ name: string; cost: number; tokens: number; messages: number }> | undefined;
   if (options.includeAgents !== false && localMessages) {
-    const pricingEntries = pricingFetcher.toPricingEntries();
-    const pricingMap = new Map(pricingEntries.map(p => [p.modelId, p.pricing]));
-
     const agentMap = new Map<string, { cost: number; tokens: number; messages: number }>();
     for (const msg of localMessages.messages) {
       if (msg.source === "opencode" && msg.agent) {
@@ -315,17 +308,9 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
         const existing = agentMap.get(normalizedAgent) || { cost: 0, tokens: 0, messages: 0 };
 
         const msgTokens = msg.input + msg.output + msg.cacheRead + msg.cacheWrite + msg.reasoning;
-        const pricing = pricingMap.get(msg.modelId);
-        let msgCost = 0;
-        if (pricing) {
-          msgCost = (msg.input * pricing.inputCostPerToken) +
-                    (msg.output * pricing.outputCostPerToken) +
-                    (msg.cacheRead * (pricing.cacheReadInputTokenCost || 0)) +
-                    (msg.cacheWrite * (pricing.cacheCreationInputTokenCost || 0));
-        }
 
         agentMap.set(normalizedAgent, {
-          cost: existing.cost + msgCost,
+          cost: existing.cost,
           tokens: existing.tokens + msgTokens,
           messages: existing.messages + 1,
         });

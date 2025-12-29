@@ -5,10 +5,9 @@
 
 import pc from "picocolors";
 import { loadCredentials, getApiBaseUrl } from "./credentials.js";
-import { PricingFetcher } from "./pricing/index.js";
 import {
   isNativeAvailable,
-  generateGraphWithPricingAsync,
+  generateGraphNative,
 } from "./native.js";
 import type { TokenContributionData } from "./graph-types.js";
 import { formatCurrency } from "./table.js";
@@ -68,14 +67,8 @@ export async function submit(options: SubmitOptions = {}): Promise<void> {
 
   console.log(pc.cyan("\n  Tokscale - Submit Usage Data\n"));
 
-  // Step 3: Generate graph data
   console.log(pc.gray("  Scanning local session data..."));
 
-  const fetcher = new PricingFetcher();
-  await fetcher.fetchPricing();
-  const pricingEntries = fetcher.toPricingEntries();
-
-  // Determine sources
   const hasFilter = options.opencode || options.claude || options.codex || options.gemini || options.cursor || options.amp || options.droid;
   let sources: SourceType[] | undefined;
   if (hasFilter) {
@@ -91,9 +84,8 @@ export async function submit(options: SubmitOptions = {}): Promise<void> {
 
   let data: TokenContributionData;
   try {
-    data = await generateGraphWithPricingAsync({
+    data = generateGraphNative({
       sources,
-      pricing: pricingEntries,
       since: options.since,
       until: options.until,
       year: options.year,

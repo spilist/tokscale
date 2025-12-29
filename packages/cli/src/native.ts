@@ -2,26 +2,15 @@
  * Native module loader for Rust core
  *
  * Exposes all Rust functions with proper TypeScript types.
- * Falls back to TypeScript implementations when native module is unavailable.
+ * Native module is REQUIRED - no TypeScript fallback.
  */
 
-import type { PricingEntry } from "./pricing/index.js";
+import type { PricingEntry } from "@tokscale/core";
 import type {
   TokenContributionData,
   GraphOptions as TSGraphOptions,
   SourceType,
 } from "./graph-types.js";
-import {
-  parseLocalSources as parseLocalSourcesTS,
-  type ParsedMessages as TSParsedMessages,
-  type UnifiedMessage,
-} from "./sessions/index.js";
-import {
-  generateModelReport as generateModelReportTS,
-  generateMonthlyReport as generateMonthlyReportTS,
-  generateGraphData as generateGraphDataTS,
-} from "./sessions/reports.js";
-import { readCursorMessagesFromCache } from "./cursor.js";
 
 // =============================================================================
 // Types matching Rust exports
@@ -455,8 +444,6 @@ export interface LocalParseOptions {
   since?: string;
   until?: string;
   year?: string;
-  /** Force TypeScript fallback even when native module is available (needed for agent field) */
-  forceTypescript?: boolean;
 }
 
 export interface FinalizeOptions {
@@ -646,38 +633,8 @@ async function runInSubprocess<T>(method: string, args: unknown[]): Promise<T> {
 }
 
 export async function parseLocalSourcesAsync(options: LocalParseOptions): Promise<ParsedMessages> {
-  // Use TypeScript fallback when native module is not available or when explicitly requested
-  if (!isNativeAvailable() || options.forceTypescript) {
-    const result = parseLocalSourcesTS({
-      sources: options.sources,
-      since: options.since,
-      until: options.until,
-      year: options.year,
-    });
-
-    return {
-      messages: result.messages.map((msg) => ({
-        source: msg.source,
-        modelId: msg.modelId,
-        providerId: msg.providerId,
-        timestamp: msg.timestamp,
-        date: msg.date,
-        input: msg.tokens.input,
-        output: msg.tokens.output,
-        cacheRead: msg.tokens.cacheRead,
-        cacheWrite: msg.tokens.cacheWrite,
-        reasoning: msg.tokens.reasoning,
-        sessionId: msg.sessionId,
-        agent: msg.agent,
-      })),
-      opencodeCount: result.opencodeCount,
-      claudeCount: result.claudeCount,
-      codexCount: result.codexCount,
-      geminiCount: result.geminiCount,
-      ampCount: result.ampCount,
-      droidCount: result.droidCount ?? 0,
-      processingTimeMs: result.processingTimeMs,
-    };
+  if (!isNativeAvailable()) {
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeLocalParseOptions = {
@@ -691,46 +648,9 @@ export async function parseLocalSourcesAsync(options: LocalParseOptions): Promis
   return runInSubprocess<ParsedMessages>("parseLocalSources", [nativeOptions]);
 }
 
-function buildMessagesForFallback(options: FinalizeOptions): UnifiedMessage[] {
-  const messages: UnifiedMessage[] = options.localMessages.messages.map((msg) => ({
-    source: msg.source,
-    modelId: msg.modelId,
-    providerId: msg.providerId,
-    sessionId: msg.sessionId,
-    timestamp: msg.timestamp,
-    date: msg.date,
-    tokens: {
-      input: msg.input,
-      output: msg.output,
-      cacheRead: msg.cacheRead,
-      cacheWrite: msg.cacheWrite,
-      reasoning: msg.reasoning,
-    },
-    cost: 0,
-    agent: msg.agent,
-  }));
-
-  if (options.includeCursor) {
-    const cursorMessages = readCursorMessagesFromCache();
-    for (const cursor of cursorMessages) {
-      const inRange =
-        (!options.year || cursor.date.startsWith(options.year)) &&
-        (!options.since || cursor.date >= options.since) &&
-        (!options.until || cursor.date <= options.until);
-      if (inRange) {
-        messages.push(cursor);
-      }
-    }
-  }
-
-  return messages;
-}
-
 export async function finalizeReportAsync(options: FinalizeOptions): Promise<ModelReport> {
   if (!isNativeAvailable()) {
-    const startTime = performance.now();
-    const messages = buildMessagesForFallback(options);
-    return generateModelReportTS(messages, options.pricing, startTime);
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeFinalizeReportOptions = {
@@ -748,9 +668,7 @@ export async function finalizeReportAsync(options: FinalizeOptions): Promise<Mod
 
 export async function finalizeMonthlyReportAsync(options: FinalizeOptions): Promise<MonthlyReport> {
   if (!isNativeAvailable()) {
-    const startTime = performance.now();
-    const messages = buildMessagesForFallback(options);
-    return generateMonthlyReportTS(messages, options.pricing, startTime);
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeFinalizeReportOptions = {
@@ -768,9 +686,7 @@ export async function finalizeMonthlyReportAsync(options: FinalizeOptions): Prom
 
 export async function finalizeGraphAsync(options: FinalizeOptions): Promise<TokenContributionData> {
   if (!isNativeAvailable()) {
-    const startTime = performance.now();
-    const messages = buildMessagesForFallback(options);
-    return generateGraphDataTS(messages, options.pricing, startTime);
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeFinalizeReportOptions = {
@@ -790,19 +706,8 @@ export async function finalizeGraphAsync(options: FinalizeOptions): Promise<Toke
 export async function generateGraphWithPricingAsync(
   options: TSGraphOptions & { pricing: PricingEntry[] }
 ): Promise<TokenContributionData> {
-  // Use TypeScript fallback when native module is not available
   if (!isNativeAvailable()) {
-    const startTime = performance.now();
-
-    // Parse local sources using TS fallback
-    const parsed = parseLocalSourcesTS({
-      sources: options.sources,
-      since: options.since,
-      until: options.until,
-      year: options.year,
-    });
-
-    return generateGraphDataTS(parsed.messages, options.pricing, startTime);
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeReportOptions = {

@@ -103,7 +103,7 @@ export interface GraphMeta {
 export interface GraphOptions {
   /** Home directory path (defaults to user's home) */
   homeDir?: string
-  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp" */
+  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp", "droid" */
   sources?: Array<string>
   /** Start date filter (YYYY-MM-DD) */
   since?: string
@@ -134,6 +134,8 @@ export interface LocalParseOptions {
   until?: string
   year?: string
 }
+
+export declare function lookupPricing(modelId: string): Promise<PricingLookupResult>
 
 /** Pricing data for a single model (passed from TypeScript) */
 export interface ModelPricing {
@@ -188,6 +190,13 @@ export interface MonthlyUsage {
   cost: number
 }
 
+export interface NativePricing {
+  inputCostPerToken: number
+  outputCostPerToken: number
+  cacheReadInputTokenCost?: number
+  cacheCreationInputTokenCost?: number
+}
+
 export interface ParsedMessage {
   source: string
   modelId: string
@@ -227,11 +236,18 @@ export interface PricingEntry {
   pricing: ModelPricing
 }
 
+export interface PricingLookupResult {
+  modelId: string
+  matchedKey: string
+  source: string
+  pricing: NativePricing
+}
+
 /** Options for reports with pricing */
 export interface ReportOptions {
   /** Home directory path (defaults to user's home) */
   homeDir?: string
-  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp" */
+  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp", "droid" */
   sources?: Array<string>
   /** Pricing data for cost calculation */
   pricing: Array<PricingEntry>

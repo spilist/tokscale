@@ -79,7 +79,7 @@ function createMockSubmissionData(overrides: Partial<{
         reasoning: 0,
       },
       sources: d.sources.map(src => ({
-        source: src.source as 'opencode' | 'claude' | 'codex' | 'gemini' | 'cursor',
+        source: src.source as 'opencode' | 'claude' | 'codex' | 'gemini' | 'cursor' | 'amp' | 'droid',
         modelId: src.modelId,
         tokens: src.tokens,
         cost: src.cost,

@@ -76,16 +76,16 @@ async function main() {
       result = nativeCore.parseLocalSources(args[0] as Parameters<typeof nativeCore.parseLocalSources>[0]);
       break;
     case "finalizeReport":
-      result = nativeCore.finalizeReport(args[0] as Parameters<typeof nativeCore.finalizeReport>[0]);
+      result = await nativeCore.finalizeReport(args[0] as Parameters<typeof nativeCore.finalizeReport>[0]);
       break;
     case "finalizeMonthlyReport":
-      result = nativeCore.finalizeMonthlyReport(args[0] as Parameters<typeof nativeCore.finalizeMonthlyReport>[0]);
+      result = await nativeCore.finalizeMonthlyReport(args[0] as Parameters<typeof nativeCore.finalizeMonthlyReport>[0]);
       break;
     case "finalizeGraph":
-      result = nativeCore.finalizeGraph(args[0] as Parameters<typeof nativeCore.finalizeGraph>[0]);
+      result = await nativeCore.finalizeGraph(args[0] as Parameters<typeof nativeCore.finalizeGraph>[0]);
       break;
     case "generateGraphWithPricing":
-      result = nativeCore.generateGraphWithPricing(args[0] as Parameters<typeof nativeCore.generateGraphWithPricing>[0]);
+      result = await nativeCore.generateGraphWithPricing(args[0] as Parameters<typeof nativeCore.generateGraphWithPricing>[0]);
       break;
     default:
       throw new Error(`Unknown method: ${method}`);

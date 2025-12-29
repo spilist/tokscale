@@ -1459,12 +1459,14 @@ pub struct PricingLookupResult {
 }
 
 #[napi]
-pub async fn lookup_pricing(model_id: String) -> napi::Result<PricingLookupResult> {
+pub async fn lookup_pricing(model_id: String, provider: Option<String>) -> napi::Result<PricingLookupResult> {
     let service = pricing::PricingService::get_or_init()
         .await
         .map_err(|e| napi::Error::from_reason(e))?;
 
-    match service.lookup(&model_id) {
+    let force_source = provider.as_deref();
+    
+    match service.lookup_with_source(&model_id, force_source) {
         Some(result) => Ok(PricingLookupResult {
             model_id,
             matched_key: result.matched_key,
@@ -1477,8 +1479,9 @@ pub async fn lookup_pricing(model_id: String) -> napi::Result<PricingLookupResul
             },
         }),
         None => Err(napi::Error::from_reason(format!(
-            "Model not found: {}",
-            model_id
+            "Model not found: {}{}",
+            model_id,
+            force_source.map(|s| format!(" (forced source: {})", s)).unwrap_or_default()
         ))),
     }
 }

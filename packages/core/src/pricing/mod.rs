@@ -45,6 +45,10 @@ impl PricingService {
         self.lookup.lookup(model_id)
     }
     
+    pub fn lookup_with_source(&self, model_id: &str, force_source: Option<&str>) -> Option<LookupResult> {
+        self.lookup.lookup_with_source(model_id, force_source)
+    }
+    
     pub fn calculate_cost(&self, model_id: &str, input: i64, output: i64, cache_read: i64, cache_write: i64, reasoning: i64) -> f64 {
         self.lookup.calculate_cost(model_id, input, output, cache_read, cache_write, reasoning)
     }

@@ -415,7 +415,7 @@ async function main() {
     .command("pricing <model-id>")
     .description("Look up pricing for a model")
     .option("--json", "Output as JSON")
-    .option("--provider <source>", "(deprecated, ignored) Force provider - pricing source is now auto-selected")
+    .option("--provider <source>", "Force pricing source: 'litellm' or 'openrouter'")
     .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
     .action(async (modelId: string, options: { json?: boolean; provider?: string; spinner?: boolean }) => {
       await handlePricingCommand(modelId, options);
@@ -992,17 +992,18 @@ async function handleWrappedCommand(options: WrappedCommandOptions) {
 }
 
 async function handlePricingCommand(modelId: string, options: { json?: boolean; provider?: string; spinner?: boolean }) {
-  // Warn about deprecated --provider flag
-  if (options.provider) {
-    console.log(pc.yellow(`\n  Warning: --provider flag is deprecated and ignored.`));
-    console.log(pc.gray("  Pricing source is now auto-selected (LiteLLM with OpenRouter fallback).\n"));
+  const validProviders = ["litellm", "openrouter"];
+  if (options.provider && !validProviders.includes(options.provider.toLowerCase())) {
+    console.log(pc.red(`\n  Invalid provider: ${options.provider}`));
+    console.log(pc.gray(`  Valid providers: ${validProviders.join(", ")}\n`));
+    process.exit(1);
   }
 
   const useSpinner = options.spinner !== false;
   const spinner = useSpinner ? createSpinner({ color: "cyan" }) : null;
-  spinner?.start(pc.gray("Fetching pricing data..."));
+  const providerLabel = options.provider ? ` from ${options.provider}` : "";
+  spinner?.start(pc.gray(`Fetching pricing data${providerLabel}...`));
 
-  // Load core module with ESM/CJS interop handling (same pattern as native.ts)
   let core: typeof import("@tokscale/core");
   try {
     const mod = await import("@tokscale/core");
@@ -1020,7 +1021,8 @@ async function handlePricingCommand(modelId: string, options: { json?: boolean; 
   }
 
   try {
-    const nativeResult = await core.lookupPricing(modelId);
+    const provider = options.provider?.toLowerCase() || undefined;
+    const nativeResult = await core.lookupPricing(modelId, provider);
     spinner?.stop();
 
     const result = {
@@ -1047,7 +1049,7 @@ async function handlePricingCommand(modelId: string, options: { json?: boolean; 
         },
       }, null, 2));
     } else {
-      const sourceLabel = result.source === "litellm" ? pc.blue("LiteLLM") : pc.magenta("OpenRouter");
+      const sourceLabel = result.source.toLowerCase() === "litellm" ? pc.blue("LiteLLM") : pc.magenta("OpenRouter");
       const inputCost = result.pricing.input_cost_per_token ?? 0;
       const outputCost = result.pricing.output_cost_per_token ?? 0;
       const cacheReadCost = result.pricing.cache_read_input_token_cost;

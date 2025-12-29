@@ -1003,62 +1003,64 @@ async function handlePricingCommand(modelId: string, options: { json?: boolean; 
   const spinner = createSpinner({ color: "cyan" });
   spinner.start(pc.gray("Fetching pricing data..."));
 
-  const fetcher = new PricingFetcher();
-  await fetcher.fetchPricing();
+  try {
+    const core = await import("@tokscale/core");
+    const nativeResult = await core.lookupPricing(modelId);
+    spinner.stop();
 
-  spinner.stop();
+    const result = {
+      matchedKey: nativeResult.matchedKey,
+      source: nativeResult.source as "litellm" | "openrouter",
+      pricing: {
+        input_cost_per_token: nativeResult.pricing.inputCostPerToken,
+        output_cost_per_token: nativeResult.pricing.outputCostPerToken,
+        cache_read_input_token_cost: nativeResult.pricing.cacheReadInputTokenCost,
+        cache_creation_input_token_cost: nativeResult.pricing.cacheCreationInputTokenCost,
+      },
+    };
 
-  let result: PricingLookupResult | null;
-  if (provider === "litellm") {
-    result = fetcher.getModelPricingFromProvider(modelId, "litellm");
-  } else if (provider === "openrouter") {
-    result = fetcher.getModelPricingFromProvider(modelId, "openrouter");
-  } else {
-    result = fetcher.getModelPricingWithSource(modelId);
-  }
+    if (options.json) {
+      console.log(JSON.stringify({
+        modelId,
+        matchedKey: result.matchedKey,
+        source: result.source,
+        pricing: {
+          inputCostPerToken: result.pricing.input_cost_per_token ?? 0,
+          outputCostPerToken: result.pricing.output_cost_per_token ?? 0,
+          cacheReadInputTokenCost: result.pricing.cache_read_input_token_cost,
+          cacheCreationInputTokenCost: result.pricing.cache_creation_input_token_cost,
+        },
+      }, null, 2));
+    } else {
+      const sourceLabel = result.source === "litellm" ? pc.blue("LiteLLM") : pc.magenta("OpenRouter");
+      const inputCost = result.pricing.input_cost_per_token ?? 0;
+      const outputCost = result.pricing.output_cost_per_token ?? 0;
+      const cacheReadCost = result.pricing.cache_read_input_token_cost;
+      const cacheWriteCost = result.pricing.cache_creation_input_token_cost;
 
-  if (!result) {
+      console.log(pc.cyan(`\n  Pricing for: ${pc.white(modelId)}`));
+      console.log(pc.gray(`  Matched key: ${result.matchedKey}`));
+      console.log(pc.gray(`  Source: `) + sourceLabel);
+      console.log();
+      console.log(pc.white(`  Input:  `) + formatPricePerMillion(inputCost));
+      console.log(pc.white(`  Output: `) + formatPricePerMillion(outputCost));
+      if (cacheReadCost !== undefined) {
+        console.log(pc.white(`  Cache Read:  `) + formatPricePerMillion(cacheReadCost));
+      }
+      if (cacheWriteCost !== undefined) {
+        console.log(pc.white(`  Cache Write: `) + formatPricePerMillion(cacheWriteCost));
+      }
+      console.log();
+    }
+  } catch (err) {
+    spinner.stop();
+    const providerNote = provider && provider !== "auto" ? ` (in ${provider})` : "";
     if (options.json) {
       console.log(JSON.stringify({ error: "Model not found", modelId, provider: provider || "auto" }, null, 2));
     } else {
-      const providerNote = provider && provider !== "auto" ? ` (in ${provider})` : "";
       console.log(pc.red(`\n  Model not found: ${modelId}${providerNote}\n`));
     }
     process.exit(1);
-  }
-
-  if (options.json) {
-    console.log(JSON.stringify({
-      modelId,
-      matchedKey: result.matchedKey,
-      source: result.source,
-      pricing: {
-        inputCostPerToken: result.pricing.input_cost_per_token ?? 0,
-        outputCostPerToken: result.pricing.output_cost_per_token ?? 0,
-        cacheReadInputTokenCost: result.pricing.cache_read_input_token_cost,
-        cacheCreationInputTokenCost: result.pricing.cache_creation_input_token_cost,
-      },
-    }, null, 2));
-  } else {
-    const sourceLabel = result.source === "litellm" ? pc.blue("LiteLLM") : pc.magenta("OpenRouter");
-    const inputCost = result.pricing.input_cost_per_token ?? 0;
-    const outputCost = result.pricing.output_cost_per_token ?? 0;
-    const cacheReadCost = result.pricing.cache_read_input_token_cost;
-    const cacheWriteCost = result.pricing.cache_creation_input_token_cost;
-
-    console.log(pc.cyan(`\n  Pricing for: ${pc.white(modelId)}`));
-    console.log(pc.gray(`  Matched key: ${result.matchedKey}`));
-    console.log(pc.gray(`  Source: `) + sourceLabel);
-    console.log();
-    console.log(pc.white(`  Input:  `) + formatPricePerMillion(inputCost));
-    console.log(pc.white(`  Output: `) + formatPricePerMillion(outputCost));
-    if (cacheReadCost !== undefined) {
-      console.log(pc.white(`  Cache Read:  `) + formatPricePerMillion(cacheReadCost));
-    }
-    if (cacheWriteCost !== undefined) {
-      console.log(pc.white(`  Cache Write: `) + formatPricePerMillion(cacheWriteCost));
-    }
-    console.log();
   }
 }
 

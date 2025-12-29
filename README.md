@@ -160,16 +160,16 @@ bun run cli
 
 > **Note**: `bun run cli` is for local development. When installed via `bunx tokscale`, the command runs directly. The Usage section below shows the installed binary commands.
 
-### Building the Native Module (Optional)
+### Building the Native Module
 
-The native Rust module provides ~10x faster processing through parallel file scanning and SIMD JSON parsing:
+The native Rust module is **required** for CLI operation. It provides ~10x faster processing through parallel file scanning and SIMD JSON parsing:
 
 ```bash
 # Build the native core (run from repository root)
 bun run build:core
 ```
 
-Native modules are enabled on the `bunx tokscale` command by default. When the native module is not installed (e.g. on local development), the CLI automatically falls back to TypeScript implementations for full compatibility (with slower performance).
+> **Note**: Native binaries are pre-built and included when you install via `bunx tokscale@latest`. Building from source is only needed for local development.
 
 ## Usage
 
@@ -604,7 +604,7 @@ Tokscale uses a hybrid architecture for optimal performance:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-All heavy computation is done in Rust when the native module is available. When the native module is not installed, the CLI automatically falls back to TypeScript implementations for full compatibility (with slower performance).
+All heavy computation is done in Rust. The native module is required for CLI operation.
 
 #### Key Technologies
 

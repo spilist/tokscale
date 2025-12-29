@@ -411,7 +411,7 @@ async function main() {
     .command("pricing <model-id>")
     .description("Look up pricing for a model")
     .option("--json", "Output as JSON")
-    .option("--provider <source>", "Force provider: litellm, openrouter, or auto (default)")
+    .option("--provider <source>", "(deprecated, ignored) Force provider - pricing source is now auto-selected")
     .action(async (modelId: string, options: { json?: boolean; provider?: string }) => {
       await handlePricingCommand(modelId, options);
     });
@@ -979,11 +979,10 @@ async function handleWrappedCommand(options: WrappedCommandOptions) {
 }
 
 async function handlePricingCommand(modelId: string, options: { json?: boolean; provider?: string }) {
-  const provider = options.provider?.toLowerCase();
-  if (provider && provider !== "auto" && provider !== "litellm" && provider !== "openrouter") {
-    console.log(pc.red(`\n  Invalid provider: ${options.provider}`));
-    console.log(pc.gray("  Valid options: litellm, openrouter, auto\n"));
-    process.exit(1);
+  // Warn about deprecated --provider flag
+  if (options.provider) {
+    console.log(pc.yellow(`\n  Warning: --provider flag is deprecated and ignored.`));
+    console.log(pc.gray("  Pricing source is now auto-selected (LiteLLM with OpenRouter fallback).\n"));
   }
 
   const spinner = createSpinner({ color: "cyan" });
@@ -1057,7 +1056,6 @@ async function handlePricingCommand(modelId: string, options: { json?: boolean; 
   } catch (err) {
     spinner.stop();
     const errorMsg = (err as Error).message || "Unknown error";
-    const providerNote = provider && provider !== "auto" ? ` (in ${provider})` : "";
     
     // Check if this is a "model not found" error from Rust or a different error
     const isModelNotFound = errorMsg.toLowerCase().includes("not found") || 
@@ -1065,13 +1063,13 @@ async function handlePricingCommand(modelId: string, options: { json?: boolean; 
     
     if (options.json) {
       if (isModelNotFound) {
-        console.log(JSON.stringify({ error: "Model not found", modelId, provider: provider || "auto" }, null, 2));
+        console.log(JSON.stringify({ error: "Model not found", modelId }, null, 2));
       } else {
-        console.log(JSON.stringify({ error: errorMsg, modelId, provider: provider || "auto" }, null, 2));
+        console.log(JSON.stringify({ error: errorMsg, modelId }, null, 2));
       }
     } else {
       if (isModelNotFound) {
-        console.log(pc.red(`\n  Model not found: ${modelId}${providerNote}\n`));
+        console.log(pc.red(`\n  Model not found: ${modelId}\n`));
       } else {
         console.log(pc.red(`\n  Error looking up pricing: ${errorMsg}\n`));
       }

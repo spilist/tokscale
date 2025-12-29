@@ -16,6 +16,7 @@ export interface PricingLookupResult {
 export class PricingFetcher {
   private pricingData: Map<string, ModelPricing> = new Map();
   private lookupResults: Map<string, PricingLookupResult> = new Map();
+  private pricingError: Error | null = null;
 
   /** @deprecated Use fetchPricingForModels() instead */
   async fetchPricing(): Promise<void> {}
@@ -26,14 +27,16 @@ export class PricingFetcher {
     const uniqueModels = [...new Set(modelIds)];
     
     try {
-      const core = await import("@tokscale/core");
+      const mod = await import("@tokscale/core");
+      const core = (mod.default ?? mod) as typeof import("@tokscale/core");
       
       const results = await Promise.allSettled(
         uniqueModels.map(async (modelId) => {
           try {
             const result = await core.lookupPricing(modelId);
             return { modelId, result };
-          } catch {
+          } catch (err) {
+            this.pricingError = err instanceof Error ? err : new Error(String(err));
             return { modelId, result: null };
           }
         })
@@ -58,7 +61,9 @@ export class PricingFetcher {
           }
         }
       }
-    } catch {}
+    } catch (err) {
+      this.pricingError = err instanceof Error ? err : new Error(String(err));
+    }
   }
 
   toPricingEntries(): PricingEntry[] {
@@ -86,9 +91,17 @@ export class PricingFetcher {
     provider: "litellm" | "openrouter"
   ): PricingLookupResult | null {
     const result = this.lookupResults.get(modelId);
-    if (result && (provider === result.source || provider === "litellm")) {
+    if (result && result.source === provider) {
       return result;
     }
     return null;
+  }
+
+  hasPricingError(): boolean {
+    return this.pricingError !== null;
+  }
+
+  getPricingError(): Error | null {
+    return this.pricingError;
   }
 }

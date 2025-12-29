@@ -4,6 +4,8 @@ use serde::{Serialize, Deserialize};
 
 const CACHE_FILENAME: &str = "pricing-litellm.json";
 const PRICING_URL: &str = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
+const MAX_RETRIES: u32 = 3;
+const INITIAL_BACKOFF_MS: u64 = 200;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ModelPricing {
@@ -26,16 +28,53 @@ pub async fn fetch() -> Result<PricingDataset, reqwest::Error> {
     
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()?;
     
-    let data: PricingDataset = client
-        .get(PRICING_URL)
-        .send()
-        .await?
-        .json()
-        .await?;
+    let mut last_error: Option<reqwest::Error> = None;
     
-    let _ = cache::save_cache(CACHE_FILENAME, &data);
+    for attempt in 0..MAX_RETRIES {
+        match client.get(PRICING_URL).send().await {
+            Ok(response) => {
+                let status = response.status();
+                
+                if status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                    eprintln!("[tokscale] LiteLLM HTTP {} (attempt {}/{})", status, attempt + 1, MAX_RETRIES);
+                    if attempt < MAX_RETRIES - 1 {
+                        tokio::time::sleep(std::time::Duration::from_millis(
+                            INITIAL_BACKOFF_MS * (1 << attempt)
+                        )).await;
+                    }
+                    continue;
+                }
+                
+                if !status.is_success() {
+                    eprintln!("[tokscale] LiteLLM HTTP {}", status);
+                    return Err(response.error_for_status().unwrap_err());
+                }
+                
+                match response.json::<PricingDataset>().await {
+                    Ok(data) => {
+                        let _ = cache::save_cache(CACHE_FILENAME, &data);
+                        return Ok(data);
+                    }
+                    Err(e) => {
+                        eprintln!("[tokscale] LiteLLM JSON parse failed: {}", e);
+                        return Err(e);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[tokscale] LiteLLM network error (attempt {}/{}): {}", attempt + 1, MAX_RETRIES, e);
+                last_error = Some(e);
+                if attempt < MAX_RETRIES - 1 {
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        INITIAL_BACKOFF_MS * (1 << attempt)
+                    )).await;
+                }
+            }
+        }
+    }
     
-    Ok(data)
+    Err(last_error.expect("should have error after retries"))
 }

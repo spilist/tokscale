@@ -22,6 +22,8 @@ export class PricingFetcher {
   async fetchPricing(): Promise<void> {}
 
   async fetchPricingForModels(modelIds: string[]): Promise<void> {
+    this.pricingError = null;
+
     if (modelIds.length === 0) return;
 
     const uniqueModels = [...new Set(modelIds)];

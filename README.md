@@ -47,7 +47,7 @@
   - [Quick Start](#quick-start)
   - [Prerequisites](#prerequisites)
   - [Development Setup](#development-setup)
-  - [Building the Native Module (Optional)](#building-the-native-module-optional)
+  - [Building the Native Module](#building-the-native-module)
 - [Usage](#usage)
   - [Basic Commands](#basic-commands)
   - [TUI Features](#tui-features)

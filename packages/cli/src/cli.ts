@@ -506,12 +506,7 @@ function getEnabledSources(options: FilterOptions): SourceType[] | undefined {
   return sources;
 }
 
-function logNativeStatus(): void {
-  if (!isNativeAvailable()) {
-    console.log(pc.yellow("  Note: Using TypeScript fallback (native module not available)"));
-    console.log(pc.gray("  Run 'bun run build:core' for ~10x faster processing.\n"));
-  }
-}
+
 
 async function fetchPricingForMessages(messages: ParsedMessages | null): Promise<PricingFetcher> {
   const fetcher = new PricingFetcher();
@@ -577,8 +572,6 @@ async function loadDataSourcesParallel(
 }
 
 async function showModelReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }) {
-  logNativeStatus();
-
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
   const onlyCursor = enabledSources?.length === 1 && enabledSources[0] === 'cursor';
@@ -713,8 +706,6 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
 }
 
 async function showMonthlyReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }) {
-  logNativeStatus();
-
   const dateRange = getDateRangeLabel(options);
   const title = dateRange 
     ? `Monthly Token Usage Report (${dateRange})`
@@ -821,8 +812,6 @@ async function outputJsonReport(
   reportType: JsonReportType,
   options: FilterOptions & DateFilterOptions
 ) {
-  logNativeStatus();
-
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
   const onlyCursor = enabledSources?.length === 1 && enabledSources[0] === 'cursor';
@@ -871,8 +860,6 @@ interface GraphCommandOptions extends FilterOptions, DateFilterOptions {
 }
 
 async function handleGraphCommand(options: GraphCommandOptions) {
-  logNativeStatus();
-
   // Start spinner for loading phase (only if outputting to file, not stdout)
   const spinner = options.output ? createSpinner({ color: "cyan" }) : null;
   spinner?.start(pc.gray("Loading data sources..."));

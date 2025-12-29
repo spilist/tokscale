@@ -15,10 +15,49 @@ export interface PricingLookupResult {
 
 export class PricingFetcher {
   private pricingData: Map<string, ModelPricing> = new Map();
+  private lookupResults: Map<string, PricingLookupResult> = new Map();
 
-  async fetchPricing(): Promise<void> {
+  /** @deprecated Use fetchPricingForModels() instead */
+  async fetchPricing(): Promise<void> {}
+
+  async fetchPricingForModels(modelIds: string[]): Promise<void> {
+    if (modelIds.length === 0) return;
+
+    const uniqueModels = [...new Set(modelIds)];
+    
     try {
-      await import("@tokscale/core");
+      const core = await import("@tokscale/core");
+      
+      const results = await Promise.allSettled(
+        uniqueModels.map(async (modelId) => {
+          try {
+            const result = await core.lookupPricing(modelId);
+            return { modelId, result };
+          } catch {
+            return { modelId, result: null };
+          }
+        })
+      );
+
+      for (const settledResult of results) {
+        if (settledResult.status === "fulfilled") {
+          const { modelId, result } = settledResult.value;
+          if (result) {
+            const pricing: ModelPricing = {
+              input_cost_per_token: result.pricing.inputCostPerToken,
+              output_cost_per_token: result.pricing.outputCostPerToken,
+              cache_read_input_token_cost: result.pricing.cacheReadInputTokenCost,
+              cache_creation_input_token_cost: result.pricing.cacheCreationInputTokenCost,
+            };
+            this.pricingData.set(modelId, pricing);
+            this.lookupResults.set(modelId, {
+              matchedKey: result.matchedKey,
+              source: result.source as "litellm" | "openrouter",
+              pricing,
+            });
+          }
+        }
+      }
     } catch {}
   }
 
@@ -39,17 +78,17 @@ export class PricingFetcher {
   }
 
   getModelPricingWithSource(modelId: string): PricingLookupResult | null {
-    const pricing = this.pricingData.get(modelId);
-    if (pricing) {
-      return { matchedKey: modelId, source: "litellm", pricing };
-    }
-    return null;
+    return this.lookupResults.get(modelId) ?? null;
   }
 
   getModelPricingFromProvider(
     modelId: string,
     provider: "litellm" | "openrouter"
   ): PricingLookupResult | null {
-    return this.getModelPricingWithSource(modelId);
+    const result = this.lookupResults.get(modelId);
+    if (result && (provider === result.source || provider === "litellm")) {
+      return result;
+    }
+    return null;
   }
 }

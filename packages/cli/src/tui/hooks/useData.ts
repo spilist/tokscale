@@ -153,19 +153,21 @@ async function loadData(enabledSources: Set<SourceType>, dateFilters?: DateFilte
   const pricingFetcher = new PricingFetcher();
   
   const phase1Results = await Promise.allSettled([
-    pricingFetcher.fetchPricing(),
     includeCursor && loadCursorCredentials() ? syncCursorCache() : Promise.resolve({ synced: false, rows: 0 }),
     localSources.length > 0
       ? parseLocalSourcesAsync({ sources: localSources as ("opencode" | "claude" | "codex" | "gemini" | "amp" | "droid")[], since, until, year })
       : Promise.resolve({ messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, ampCount: 0, droidCount: 0, processingTimeMs: 0 } as ParsedMessages),
   ]);
 
-  const cursorSync = phase1Results[1].status === "fulfilled" 
-    ? phase1Results[1].value 
+  const cursorSync = phase1Results[0].status === "fulfilled" 
+    ? phase1Results[0].value 
     : { synced: false, rows: 0 };
-  const localMessages = phase1Results[2].status === "fulfilled" 
-    ? phase1Results[2].value 
+  const localMessages = phase1Results[1].status === "fulfilled" 
+    ? phase1Results[1].value 
     : null;
+
+  const modelIds = localMessages?.messages.map(m => m.modelId) ?? [];
+  await pricingFetcher.fetchPricingForModels(modelIds);
 
   const emptyMessages: ParsedMessages = {
     messages: [],

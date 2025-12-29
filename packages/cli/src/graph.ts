@@ -13,19 +13,28 @@ import type {
 } from "./graph-types.js";
 
 let nativeModule: typeof import("./native.js") | null = null;
+let nativeLoadError: Error | null = null;
+
 try {
   nativeModule = await import("./native.js");
-} catch {}
+} catch (e) {
+  nativeLoadError = e as Error;
+}
 
 export function isNativeAvailable(): boolean {
   return nativeModule?.isNativeAvailable() ?? false;
+}
+
+export function getNativeLoadError(): Error | null {
+  return nativeLoadError;
 }
 
 export async function generateGraphData(
   options: GraphOptions = {}
 ): Promise<TokenContributionData> {
   if (!nativeModule?.isNativeAvailable()) {
-    throw new Error("Native module required. Run: bun run build:core");
+    const cause = nativeLoadError ? `: ${nativeLoadError.message}` : "";
+    throw new Error(`Native module required${cause}. Run: bun run build:core`);
   }
   return nativeModule.generateGraphNative(options);
 }

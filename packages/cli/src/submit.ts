@@ -5,10 +5,7 @@
 
 import pc from "picocolors";
 import { loadCredentials, getApiBaseUrl } from "./credentials.js";
-import {
-  isNativeAvailable,
-  generateGraphNative,
-} from "./native.js";
+import { generateGraphNative } from "./native.js";
 import type { TokenContributionData } from "./graph-types.js";
 import { formatCurrency } from "./table.js";
 
@@ -57,12 +54,6 @@ export async function submit(options: SubmitOptions = {}): Promise<void> {
     console.log(pc.yellow("\n  Not logged in."));
     console.log(pc.gray("  Run 'tokscale login' first.\n"));
     process.exit(1);
-  }
-
-  // Step 2: Log native module status (TS fallback available)
-  if (!isNativeAvailable()) {
-    console.log(pc.yellow("\n  Note: Using TypeScript fallback (native module not available)"));
-    console.log(pc.gray("  Run 'bun run build:core' for faster processing.\n"));
   }
 
   console.log(pc.cyan("\n  Tokscale - Submit Usage Data\n"));

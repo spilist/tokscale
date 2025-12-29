@@ -513,9 +513,10 @@ function logNativeStatus(): void {
   }
 }
 
-async function fetchPricingData(): Promise<PricingFetcher> {
+async function fetchPricingForMessages(messages: ParsedMessages | null): Promise<PricingFetcher> {
   const fetcher = new PricingFetcher();
-  await fetcher.fetchPricing();
+  const modelIds = messages?.messages.map(m => m.modelId) ?? [];
+  await fetcher.fetchPricingForModels(modelIds);
   return fetcher;
 }
 
@@ -544,26 +545,14 @@ interface LoadedDataSources {
   localMessages: ParsedMessages | null;
 }
 
-/**
- * Load all data sources in parallel (two-phase optimization):
- * - Cursor API sync (network)
- * - Pricing fetch (network)
- * - Local file parsing (CPU/IO) - OpenCode, Claude, Codex, Gemini
- * 
- * This overlaps network I/O with local file parsing for better performance.
- */
 async function loadDataSourcesParallel(
   localSources: SourceType[],
   dateFilters: { since?: string; until?: string; year?: string }
 ): Promise<LoadedDataSources> {
-  // Skip local parsing if no local sources requested (e.g., cursor-only mode)
   const shouldParseLocal = localSources.length > 0;
 
-  // Use Promise.allSettled for graceful degradation
-  const [cursorResult, pricingResult, localResult] = await Promise.allSettled([
+  const [cursorResult, localResult] = await Promise.allSettled([
     syncCursorData(),
-    fetchPricingData(),
-    // Parse local sources in parallel (excludes Cursor) - skip if empty
     shouldParseLocal
       ? parseLocalSourcesAsync({
           sources: localSources.filter(s => s !== 'cursor'),
@@ -574,18 +563,15 @@ async function loadDataSourcesParallel(
       : Promise.resolve(null),
   ]);
 
-  // Handle partial failures gracefully
   const cursorSync: CursorSyncResult = cursorResult.status === 'fulfilled'
     ? cursorResult.value
     : { attempted: true, synced: false, rows: 0, error: 'Cursor sync failed' };
 
-  const fetcher: PricingFetcher = pricingResult.status === 'fulfilled'
-    ? pricingResult.value
-    : new PricingFetcher(); // Empty pricing → costs = 0
-
   const localMessages: ParsedMessages | null = localResult.status === 'fulfilled'
     ? localResult.value
     : null;
+
+  const fetcher = await fetchPricingForMessages(localMessages);
 
   return { fetcher, cursorSync, localMessages };
 }
@@ -1003,8 +989,24 @@ async function handlePricingCommand(modelId: string, options: { json?: boolean; 
   const spinner = createSpinner({ color: "cyan" });
   spinner.start(pc.gray("Fetching pricing data..."));
 
+  // Load core module with ESM/CJS interop handling (same pattern as native.ts)
+  let core: typeof import("@tokscale/core");
   try {
-    const core = await import("@tokscale/core");
+    const mod = await import("@tokscale/core");
+    core = (mod.default ?? mod) as typeof import("@tokscale/core");
+  } catch (importErr) {
+    spinner.stop();
+    const errorMsg = (importErr as Error).message || "Unknown error";
+    if (options.json) {
+      console.log(JSON.stringify({ error: "Native module not available", details: errorMsg }, null, 2));
+    } else {
+      console.log(pc.red(`\n  Native module not available: ${errorMsg}`));
+      console.log(pc.gray("  Run 'bun run build:core' to build the native module.\n"));
+    }
+    process.exit(1);
+  }
+
+  try {
     const nativeResult = await core.lookupPricing(modelId);
     spinner.stop();
 
@@ -1054,11 +1056,25 @@ async function handlePricingCommand(modelId: string, options: { json?: boolean; 
     }
   } catch (err) {
     spinner.stop();
+    const errorMsg = (err as Error).message || "Unknown error";
     const providerNote = provider && provider !== "auto" ? ` (in ${provider})` : "";
+    
+    // Check if this is a "model not found" error from Rust or a different error
+    const isModelNotFound = errorMsg.toLowerCase().includes("not found") || 
+                            errorMsg.toLowerCase().includes("no pricing");
+    
     if (options.json) {
-      console.log(JSON.stringify({ error: "Model not found", modelId, provider: provider || "auto" }, null, 2));
+      if (isModelNotFound) {
+        console.log(JSON.stringify({ error: "Model not found", modelId, provider: provider || "auto" }, null, 2));
+      } else {
+        console.log(JSON.stringify({ error: errorMsg, modelId, provider: provider || "auto" }, null, 2));
+      }
     } else {
-      console.log(pc.red(`\n  Model not found: ${modelId}${providerNote}\n`));
+      if (isModelNotFound) {
+        console.log(pc.red(`\n  Model not found: ${modelId}${providerNote}\n`));
+      } else {
+        console.log(pc.red(`\n  Error looking up pricing: ${errorMsg}\n`));
+      }
     }
     process.exit(1);
   }

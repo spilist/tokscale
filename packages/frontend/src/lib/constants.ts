@@ -31,6 +31,7 @@ export const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   gemini: "Gemini CLI",
   cursor: "Cursor",
   amp: "Amp",
+  droid: "Droid",
 };
 
 export const SOURCE_COLORS: Record<string, string> = {
@@ -40,6 +41,11 @@ export const SOURCE_COLORS: Record<string, string> = {
   gemini: "#8b5cf6",
   cursor: "#22c55e",
   amp: "#EC4899",
+  droid: "#1F1D1C",
+};
+
+export const SOURCE_TEXT_COLORS: Record<string, string> = {
+  droid: "#FFFFFF",
 };
 
 // Derived values

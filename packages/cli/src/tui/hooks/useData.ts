@@ -20,10 +20,10 @@ import {
   finalizeGraphAsync,
   type ParsedMessages,
 } from "../../native.js";
-import { PricingFetcher } from "../../pricing.js";
+
 import { syncCursorCache, loadCursorCredentials } from "../../cursor.js";
 import { getModelColor } from "../utils/colors.js";
-import { loadCachedData, saveCachedData, isCacheStale } from "../config/settings.js";
+import { loadCachedData, saveCachedData, isCacheStale, loadSettings } from "../config/settings.js";
 
 export type {
   SortType,
@@ -144,27 +144,30 @@ function calculateLongestSession(messages: Array<{ sessionId: string; timestamp:
   return `${totalSeconds}s`;
 }
 
-async function loadData(enabledSources: Set<SourceType>, dateFilters?: DateFilters): Promise<TUIData> {
+async function loadData(
+  enabledSources: Set<SourceType>, 
+  dateFilters?: DateFilters,
+  setPhase?: (phase: LoadingPhase) => void
+): Promise<TUIData> {
   const sources = Array.from(enabledSources);
   const localSources = sources.filter(s => s !== "cursor");
   const includeCursor = sources.includes("cursor");
   const { since, until, year } = dateFilters ?? {};
 
-  const pricingFetcher = new PricingFetcher();
+  setPhase?.("parsing-sources");
   
   const phase1Results = await Promise.allSettled([
-    pricingFetcher.fetchPricing(),
     includeCursor && loadCursorCredentials() ? syncCursorCache() : Promise.resolve({ synced: false, rows: 0 }),
     localSources.length > 0
       ? parseLocalSourcesAsync({ sources: localSources as ("opencode" | "claude" | "codex" | "gemini" | "amp" | "droid")[], since, until, year })
       : Promise.resolve({ messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, ampCount: 0, droidCount: 0, processingTimeMs: 0 } as ParsedMessages),
   ]);
 
-  const cursorSync = phase1Results[1].status === "fulfilled" 
-    ? phase1Results[1].value 
+  const cursorSync = phase1Results[0].status === "fulfilled" 
+    ? phase1Results[0].value 
     : { synced: false, rows: 0 };
-  const localMessages = phase1Results[2].status === "fulfilled" 
-    ? phase1Results[2].value 
+  const localMessages = phase1Results[1].status === "fulfilled" 
+    ? phase1Results[1].value 
     : null;
 
   const emptyMessages: ParsedMessages = {
@@ -178,10 +181,10 @@ async function loadData(enabledSources: Set<SourceType>, dateFilters?: DateFilte
     processingTimeMs: 0,
   };
 
+  setPhase?.("finalizing-report");
   const phase2Results = await Promise.allSettled([
     finalizeReportAsync({
       localMessages: localMessages || emptyMessages,
-      pricing: pricingFetcher.toPricingEntries(),
       includeCursor: includeCursor && cursorSync.synced,
       since,
       until,
@@ -189,7 +192,6 @@ async function loadData(enabledSources: Set<SourceType>, dateFilters?: DateFilte
     }),
     finalizeGraphAsync({
       localMessages: localMessages || emptyMessages,
-      pricing: pricingFetcher.toPricingEntries(),
       includeCursor: includeCursor && cursorSync.synced,
       since,
       until,
@@ -207,7 +209,8 @@ async function loadData(enabledSources: Set<SourceType>, dateFilters?: DateFilte
   const report = phase2Results[0].value;
   const graph = phase2Results[1].value;
 
-  const modelEntries: ModelEntry[] = report.entries.map(e => ({
+  const settings = loadSettings();
+  const allModelEntries: ModelEntry[] = report.entries.map(e => ({
     source: e.source,
     model: e.model,
     input: e.input,
@@ -218,6 +221,9 @@ async function loadData(enabledSources: Set<SourceType>, dateFilters?: DateFilte
     total: e.input + e.output + e.cacheWrite + e.cacheRead + e.reasoning,
     cost: e.cost,
   }));
+  const modelEntries = settings.includeUnusedModels
+    ? allModelEntries
+    : allModelEntries.filter(e => e.total > 0);
 
   const dailyMap = new Map<string, DailyEntry>();
   for (const contrib of graph.contributions) {
@@ -492,20 +498,20 @@ export function useData(enabledSources: Accessor<Set<SourceType>>, dateFilters?:
         setData(cachedData);
         setLoading(false);
         setIsRefreshing(true);
-        setLoadingPhase("loading-pricing");
+        setLoadingPhase("idle");
       } else {
         setLoading(true);
-        setLoadingPhase("loading-pricing");
+        setLoadingPhase("idle");
       }
     } else {
       setIsRefreshing(true);
-      setLoadingPhase("loading-pricing");
+      setLoadingPhase("idle");
       setForceRefresh(false);
     }
     
     const requestId = currentRequestId;
     setError(null);
-    loadData(sources, dateFilters)
+    loadData(sources, dateFilters, setLoadingPhase)
       .then((freshData) => {
         if (requestId !== currentRequestId) return;
         setData(freshData);

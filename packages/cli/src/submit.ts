@@ -5,11 +5,7 @@
 
 import pc from "picocolors";
 import { loadCredentials, getApiBaseUrl } from "./credentials.js";
-import { PricingFetcher } from "./pricing.js";
-import {
-  isNativeAvailable,
-  generateGraphWithPricingAsync,
-} from "./native.js";
+import { generateGraphNative } from "./native.js";
 import type { TokenContributionData } from "./graph-types.js";
 import { formatCurrency } from "./table.js";
 
@@ -60,22 +56,10 @@ export async function submit(options: SubmitOptions = {}): Promise<void> {
     process.exit(1);
   }
 
-  // Step 2: Log native module status (TS fallback available)
-  if (!isNativeAvailable()) {
-    console.log(pc.yellow("\n  Note: Using TypeScript fallback (native module not available)"));
-    console.log(pc.gray("  Run 'bun run build:core' for faster processing.\n"));
-  }
-
   console.log(pc.cyan("\n  Tokscale - Submit Usage Data\n"));
 
-  // Step 3: Generate graph data
   console.log(pc.gray("  Scanning local session data..."));
 
-  const fetcher = new PricingFetcher();
-  await fetcher.fetchPricing();
-  const pricingEntries = fetcher.toPricingEntries();
-
-  // Determine sources
   const hasFilter = options.opencode || options.claude || options.codex || options.gemini || options.cursor || options.amp || options.droid;
   let sources: SourceType[] | undefined;
   if (hasFilter) {
@@ -91,9 +75,8 @@ export async function submit(options: SubmitOptions = {}): Promise<void> {
 
   let data: TokenContributionData;
   try {
-    data = await generateGraphWithPricingAsync({
+    data = generateGraphNative({
       sources,
-      pricing: pricingEntries,
       since: options.since,
       until: options.until,
       year: options.year,

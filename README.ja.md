@@ -122,16 +122,16 @@ bun run cli
 
 > **注**: `bun run cli`はローカル開発用です。`bunx tokscale`でインストールすると、コマンドが直接実行されます。以下の使用法セクションはインストールされたバイナリコマンドを示しています。
 
-### ネイティブモジュールのビルド（オプション）
+### ネイティブモジュールのビルド
 
-ネイティブRustモジュールは並列ファイルスキャンとSIMD JSON解析により約10倍高速な処理を提供します：
+ネイティブRustモジュールはCLI操作に**必須**です。並列ファイルスキャンとSIMD JSON解析により約10倍高速な処理を提供します：
 
 ```bash
 # ネイティブコアをビルド（リポジトリルートから実行）
 bun run build:core
 ```
 
-ネイティブモジュールは`bunx tokscale`コマンドでデフォルトで有効になっています。ネイティブモジュールがインストールされていない場合（例：ローカル開発時）、CLIは完全な互換性のために自動的にTypeScript実装にフォールバックします（パフォーマンスは低下）。
+> **注**: `bunx tokscale@latest`でインストールすると、ネイティブバイナリはビルド済みで含まれています。ソースからのビルドはローカル開発にのみ必要です。
 
 ## 使用方法
 
@@ -224,6 +224,46 @@ tokscale monthly --month --benchmark
 ```
 
 > **注**: 日付フィルターはローカルタイムゾーンを使用します。`--since`と`--until`は両方とも包括的です。
+
+### 価格検索
+
+任意のモデルのリアルタイム価格を検索します：
+
+```bash
+# モデル価格を検索
+tokscale pricing "claude-3-5-sonnet-20241022"
+tokscale pricing "gpt-4o"
+tokscale pricing "grok-code"
+
+# 特定のプロバイダーソースを強制
+tokscale pricing "grok-code" --provider openrouter
+tokscale pricing "claude-3-5-sonnet" --provider litellm
+```
+
+**検索戦略：**
+
+価格検索は多段階の解決戦略を使用します：
+
+1. **完全一致** - LiteLLM/OpenRouterデータベースでの直接検索
+2. **エイリアス解決** - 親しみやすい名前を解決（例：`big-pickle` → `glm-4.7`）
+3. **ティアサフィックス除去** - 品質ティアを削除（`gpt-5.2-xhigh` → `gpt-5.2`）
+4. **バージョン正規化** - バージョン形式を処理（`claude-3-5-sonnet` ↔ `claude-3.5-sonnet`）
+5. **プロバイダープレフィックスマッチング** - 一般的なプレフィックスを試行（`anthropic/`、`openai/`など）
+6. **ファジーマッチング** - 部分モデル名の単語境界マッチング
+
+**プロバイダー優先順位：**
+
+複数のマッチがある場合、オリジナルモデル作成者がリセラーより優先されます：
+
+| 優先（オリジナル） | 非優先（リセラー） |
+|---------------------|-------------------------|
+| `xai/`（Grok） | `azure_ai/` |
+| `anthropic/`（Claude） | `bedrock/` |
+| `openai/`（GPT） | `vertex_ai/` |
+| `google/`（Gemini） | `together_ai/` |
+| `meta-llama/` | `fireworks_ai/` |
+
+例：`grok-code`は`azure_ai/grok-code-fast-1`（$3.50/$17.50）ではなく`xai/grok-code-fast-1`（$0.20/$1.50）にマッチします。
 
 ### ソーシャルプラットフォームコマンド
 
@@ -497,92 +537,6 @@ tokscale graph --benchmark     # グラフ生成をベンチマーク
 tokscale graph --output packages/frontend/public/my-data.json
 ```
 
-### アーキテクチャ
-
-```
-tokscale/
-├── packages/
-│   ├── cli/src/            # TypeScript CLI
-│   │   ├── cli.ts          # Commander.jsエントリーポイント
-│   │   ├── tui/            # OpenTUIインタラクティブインターフェース
-│   │   │   ├── App.tsx     # メインTUIアプリ（Solid.js）
-│   │   │   ├── components/ # TUIコンポーネント
-│   │   │   ├── hooks/      # データフェッチ＆状態
-│   │   │   ├── config/     # テーマ＆設定
-│   │   │   └── utils/      # フォーマットユーティリティ
-│   │   ├── sessions/       # プラットフォームセッションパーサー
-│   │   │   ├── claudecode.ts  # Claude Codeパーサー
-│   │   │   ├── codex.ts       # Codex CLIパーサー
-│   │   │   ├── gemini.ts      # Gemini CLIパーサー
-│   │   │   └── opencode.ts    # OpenCodeパーサー
-│   │   ├── cursor.ts       # Cursor IDE統合
-│   │   ├── graph.ts        # グラフデータ生成
-│   │   ├── pricing.ts      # LiteLLM価格フェッチャー
-│   │   └── native.ts       # ネイティブモジュールローダー
-│   │
-│   ├── core/               # Rustネイティブモジュール（napi-rs）
-│   │   ├── src/
-│   │   │   ├── lib.rs      # NAPIエクスポート
-│   │   │   ├── scanner.rs  # 並列ファイル探索
-│   │   │   ├── parser.rs   # SIMD JSON解析
-│   │   │   ├── aggregator.rs # 並列集計
-│   │   │   ├── pricing.rs  # コスト計算
-│   │   │   └── sessions/   # プラットフォーム固有パーサー
-│   │   ├── Cargo.toml
-│   │   └── package.json
-│   │
-│   ├── frontend/           # Next.js可視化＆ソーシャルプラットフォーム
-│   │   └── src/
-│   │       ├── app/        # Next.jsアプリルーター
-│   │       └── components/ # Reactコンポーネント
-│   │
-│   └── benchmarks/         # パフォーマンスベンチマーク
-│       ├── runner.ts       # ベンチマークハーネス
-│       └── generate.ts     # 合成データジェネレーター
-```
-
-#### ハイブリッドTypeScript + Rustアーキテクチャ
-
-Tokscaleは最適なパフォーマンスのためにハイブリッドアーキテクチャを使用しています：
-
-1. **TypeScriptレイヤー**: CLIインターフェース、価格フェッチ（ディスクキャッシュ付き）、出力フォーマット
-2. **Rustネイティブコア**: すべての解析、コスト計算、集計
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     TypeScript (CLI)                        │
-│  • LiteLLMから価格を取得（ディスクキャッシュ、1時間TTL）        │
-│  • 価格データをRustに渡す                                     │
-│  • フォーマットされた結果を表示                                │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ pricing entries
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Rustネイティブコア                         │
-│  • 並列ファイルスキャン（rayon）                              │
-│  • SIMD JSON解析（simd-json）                               │
-│  • 価格データを使用したコスト計算                              │
-│  • モデル/月/日別の並列集計                                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-ネイティブモジュールが利用可能な場合、すべての重い計算はRustで行われます。ネイティブモジュールがインストールされていない場合、CLIは完全な互換性のためにTypeScript実装に自動的にフォールバックします（パフォーマンスは低下）。
-
-#### 主要技術
-
-| レイヤー | 技術 | 用途 |
-|-------|------------|---------|
-| CLI | [Commander.js](https://github.com/tj/commander.js) | コマンドライン解析 |
-| TUI | [OpenTUI](https://github.com/sst/opentui) + [Solid.js](https://www.solidjs.com/) | インタラクティブターミナルUI（ゼロフリッカーレンダリング） |
-| ランタイム | [Bun](https://bun.sh/) | 高速JavaScriptランタイム（必須） |
-| テーブル | [cli-table3](https://github.com/cli-table/cli-table3) | ターミナルテーブルレンダリング（レガシーCLI） |
-| 色 | [picocolors](https://github.com/alexeyraspopov/picocolors) | ターミナルカラー |
-| ネイティブ | [napi-rs](https://napi.rs/) | Rust用Node.jsバインディング |
-| 並列性 | [Rayon](https://github.com/rayon-rs/rayon) | Rustデータ並列処理 |
-| JSON | [simd-json](https://github.com/simd-lite/simd-json) | SIMD高速化解析 |
-| フロントエンド | [Next.js 16](https://nextjs.org/) | Reactフレームワーク |
-| 3D可視化 | [obelisk.js](https://github.com/nicklockwood/obelisk.js) | アイソメトリック3Dレンダリング |
-
 ### パフォーマンス
 
 ネイティブRustモジュールは大幅なパフォーマンス向上を提供します：
@@ -765,7 +719,9 @@ CursorデータはセッショントークンでCursor APIから取得され、�
 
 Tokscaleは[LiteLLMの価格データベース](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)からリアルタイム価格を取得します。
 
-**キャッシュ**: 価格データは1時間TTLで`~/.cache/tokscale/pricing.json`にディスクキャッシュされます。これにより、価格データを最新に保ちながら高速な起動を確保します。
+**キャッシュ**: 価格データは1時間TTLでディスクにキャッシュされ、高速な起動を確保します：
+- LiteLLMキャッシュ: `~/.cache/tokscale/pricing-litellm.json`
+- OpenRouterキャッシュ: `~/.cache/tokscale/pricing-openrouter.json`（増分式、使用したモデルのみキャッシュ）
 
 価格には以下が含まれます：
 - 入力トークン

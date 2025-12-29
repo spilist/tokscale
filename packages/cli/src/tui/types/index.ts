@@ -105,9 +105,8 @@ export interface TUISettings {
 
 export type LoadingPhase = 
   | "idle"
-  | "loading-pricing"
-  | "syncing-cursor"
   | "parsing-sources"
+  | "loading-pricing"
   | "finalizing-report"
   | "complete";
 

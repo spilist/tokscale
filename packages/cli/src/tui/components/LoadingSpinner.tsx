@@ -31,9 +31,8 @@ function getScannerState(frame: number): SpinnerState {
 
 const PHASE_MESSAGES: Record<LoadingPhase, string> = {
   "idle": "Initializing...",
+  "parsing-sources": "Scanning session data...",
   "loading-pricing": "Loading pricing data...",
-  "syncing-cursor": "Syncing Cursor data...",
-  "parsing-sources": "Parsing session files...",
   "finalizing-report": "Finalizing report...",
   "complete": "Complete",
 };

@@ -14,7 +14,7 @@ import pc from "picocolors";
 import { login, logout, whoami } from "./auth.js";
 import { submit } from "./submit.js";
 import { generateWrapped } from "./wrapped.js";
-import { PricingFetcher } from "./pricing.js";
+
 import {
   loadCursorCredentials,
   saveCursorCredentials,
@@ -48,6 +48,7 @@ import * as fs from "node:fs";
 import { performance } from "node:perf_hooks";
 import type { SourceType } from "./graph-types.js";
 import type { TUIOptions, TabType } from "./tui/types/index.js";
+import { loadSettings } from "./tui/config/settings.js";
 
 type LaunchTUIFunction = (options?: TUIOptions) => Promise<void>;
 
@@ -228,18 +229,19 @@ async function main() {
     .option("--until <date>", "End date (YYYY-MM-DD)")
     .option("--year <year>", "Filter to specific year")
     .option("--benchmark", "Show processing time")
+    .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
     .action(async (options) => {
       if (options.json) {
         await outputJsonReport("monthly", options);
       } else if (options.light) {
-        await showMonthlyReport(options);
+        await showMonthlyReport(options, { spinner: options.spinner });
       } else {
         const launchTUI = await tryLoadTUI();
         if (launchTUI) {
           await launchTUI(buildTUIOptions(options, "daily"));
         } else {
           showTUIUnavailableMessage();
-          await showMonthlyReport(options);
+          await showMonthlyReport(options, { spinner: options.spinner });
         }
       }
     });
@@ -263,18 +265,19 @@ async function main() {
     .option("--until <date>", "End date (YYYY-MM-DD)")
     .option("--year <year>", "Filter to specific year")
     .option("--benchmark", "Show processing time")
+    .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
     .action(async (options) => {
       if (options.json) {
         await outputJsonReport("models", options);
       } else if (options.light) {
-        await showModelReport(options);
+        await showModelReport(options, { spinner: options.spinner });
       } else {
         const launchTUI = await tryLoadTUI();
         if (launchTUI) {
           await launchTUI(buildTUIOptions(options, "model"));
         } else {
           showTUIUnavailableMessage();
-          await showModelReport(options);
+          await showModelReport(options, { spinner: options.spinner });
         }
       }
     });
@@ -297,6 +300,7 @@ async function main() {
     .option("--until <date>", "End date (YYYY-MM-DD)")
     .option("--year <year>", "Filter to specific year")
     .option("--benchmark", "Show processing time")
+    .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
     .action(async (options) => {
       await handleGraphCommand(options);
     });
@@ -407,9 +411,15 @@ async function main() {
       }
     });
 
-  // =========================================================================
-  // Cursor IDE Authentication Commands
-  // =========================================================================
+  program
+    .command("pricing <model-id>")
+    .description("Look up pricing for a model")
+    .option("--json", "Output as JSON")
+    .option("--provider <source>", "Force pricing source: 'litellm' or 'openrouter'")
+    .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
+    .action(async (modelId: string, options: { json?: boolean; provider?: string; spinner?: boolean }) => {
+      await handlePricingCommand(modelId, options);
+    });
 
   const cursorCommand = program
     .command("cursor")
@@ -442,7 +452,7 @@ async function main() {
   // Global flags should go to main program
   const isGlobalFlag = ['--help', '-h', '--version', '-V'].includes(firstArg);
   const hasSubcommand = args.length > 0 && !firstArg.startsWith('-');
-  const knownCommands = ['monthly', 'models', 'graph', 'wrapped', 'login', 'logout', 'whoami', 'submit', 'cursor', 'tui', 'help'];
+  const knownCommands = ['monthly', 'models', 'graph', 'wrapped', 'login', 'logout', 'whoami', 'submit', 'cursor', 'tui', 'pricing', 'help'];
   const isKnownCommand = hasSubcommand && knownCommands.includes(firstArg);
 
   if (isKnownCommand || isGlobalFlag) {
@@ -467,20 +477,21 @@ async function main() {
       .option("--until <date>", "End date (YYYY-MM-DD)")
       .option("--year <year>", "Filter to specific year")
       .option("--benchmark", "Show processing time")
+      .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
       .parse();
     
     const opts = defaultProgram.opts();
     if (opts.json) {
       await outputJsonReport("models", opts);
     } else if (opts.light) {
-      await showModelReport(opts);
+      await showModelReport(opts, { spinner: opts.spinner });
     } else {
       const launchTUI = await tryLoadTUI();
       if (launchTUI) {
         await launchTUI(buildTUIOptions(opts));
       } else {
         showTUIUnavailableMessage();
-        await showModelReport(opts);
+        await showModelReport(opts, { spinner: opts.spinner });
       }
     }
   }
@@ -501,18 +512,9 @@ function getEnabledSources(options: FilterOptions): SourceType[] | undefined {
   return sources;
 }
 
-function logNativeStatus(): void {
-  if (!isNativeAvailable()) {
-    console.log(pc.yellow("  Note: Using TypeScript fallback (native module not available)"));
-    console.log(pc.gray("  Run 'bun run build:core' for ~10x faster processing.\n"));
-  }
-}
 
-async function fetchPricingData(): Promise<PricingFetcher> {
-  const fetcher = new PricingFetcher();
-  await fetcher.fetchPricing();
-  return fetcher;
-}
+
+
 
 /**
  * Sync Cursor usage data from API to local cache.
@@ -534,31 +536,19 @@ async function syncCursorData(): Promise<CursorSyncResult> {
 }
 
 interface LoadedDataSources {
-  fetcher: PricingFetcher;
   cursorSync: CursorSyncResult;
   localMessages: ParsedMessages | null;
 }
 
-/**
- * Load all data sources in parallel (two-phase optimization):
- * - Cursor API sync (network)
- * - Pricing fetch (network)
- * - Local file parsing (CPU/IO) - OpenCode, Claude, Codex, Gemini
- * 
- * This overlaps network I/O with local file parsing for better performance.
- */
 async function loadDataSourcesParallel(
   localSources: SourceType[],
-  dateFilters: { since?: string; until?: string; year?: string }
+  dateFilters: { since?: string; until?: string; year?: string },
+  onPhase?: (phase: string) => void
 ): Promise<LoadedDataSources> {
-  // Skip local parsing if no local sources requested (e.g., cursor-only mode)
   const shouldParseLocal = localSources.length > 0;
 
-  // Use Promise.allSettled for graceful degradation
-  const [cursorResult, pricingResult, localResult] = await Promise.allSettled([
+  const [cursorResult, localResult] = await Promise.allSettled([
     syncCursorData(),
-    fetchPricingData(),
-    // Parse local sources in parallel (excludes Cursor) - skip if empty
     shouldParseLocal
       ? parseLocalSourcesAsync({
           sources: localSources.filter(s => s !== 'cursor'),
@@ -569,25 +559,18 @@ async function loadDataSourcesParallel(
       : Promise.resolve(null),
   ]);
 
-  // Handle partial failures gracefully
   const cursorSync: CursorSyncResult = cursorResult.status === 'fulfilled'
     ? cursorResult.value
     : { attempted: true, synced: false, rows: 0, error: 'Cursor sync failed' };
-
-  const fetcher: PricingFetcher = pricingResult.status === 'fulfilled'
-    ? pricingResult.value
-    : new PricingFetcher(); // Empty pricing → costs = 0
 
   const localMessages: ParsedMessages | null = localResult.status === 'fulfilled'
     ? localResult.value
     : null;
 
-  return { fetcher, cursorSync, localMessages };
+  return { cursorSync, localMessages };
 }
 
-async function showModelReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }) {
-  logNativeStatus();
-
+async function showModelReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }, extraOptions?: { spinner?: boolean }) {
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
   const onlyCursor = enabledSources?.length === 1 && enabledSources[0] === 'cursor';
@@ -614,27 +597,30 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
   }
   console.log();
 
-  // Start spinner for loading phase
-  const spinner = createSpinner({ color: "cyan" });
-  spinner.start(pc.gray("Loading data sources..."));
+  const useSpinner = extraOptions?.spinner !== false;
+  const spinner = useSpinner ? createSpinner({ color: "cyan" }) : null;
 
-  // Filter out cursor for local parsing (it's synced separately via network)
   const localSources: SourceType[] = (enabledSources || ['opencode', 'claude', 'codex', 'gemini', 'cursor', 'amp', 'droid'])
     .filter(s => s !== 'cursor');
 
-  // Two-phase parallel loading: network (Cursor + pricing) overlaps with local file parsing
-  // If cursor-only, skip local parsing entirely
-  const { fetcher, cursorSync, localMessages } = await loadDataSourcesParallel(
+  spinner?.start(pc.gray("Scanning session data..."));
+
+  const { cursorSync, localMessages } = await loadDataSourcesParallel(
     onlyCursor ? [] : localSources,
-    dateFilters
+    dateFilters,
+    (phase) => spinner?.update(phase)
   );
   
   if (!localMessages && !onlyCursor) {
-    spinner.error('Failed to parse local session files');
+    if (spinner) {
+      spinner.error('Failed to parse local session files');
+    } else {
+      console.error('Failed to parse local session files');
+    }
     process.exit(1);
   }
 
-  spinner.update(pc.gray("Finalizing report..."));
+  spinner?.update(pc.gray("Finalizing report..."));
   const startTime = performance.now();
 
   let report: ModelReport;
@@ -642,19 +628,22 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
     const emptyMessages: ParsedMessages = { messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, ampCount: 0, droidCount: 0, processingTimeMs: 0 };
     report = await finalizeReportAsync({
       localMessages: localMessages || emptyMessages,
-      pricing: fetcher.toPricingEntries(),
       includeCursor: includeCursor && cursorSync.synced,
       since: dateFilters.since,
       until: dateFilters.until,
       year: dateFilters.year,
     });
   } catch (e) {
-    spinner.error(`Error: ${(e as Error).message}`);
+    if (spinner) {
+      spinner.error(`Error: ${(e as Error).message}`);
+    } else {
+      console.error(`Error: ${(e as Error).message}`);
+    }
     process.exit(1);
   }
 
   const processingTime = performance.now() - startTime;
-  spinner.stop();
+  spinner?.stop();
 
   if (report.entries.length === 0) {
     if (onlyCursor && !cursorSync.synced) {
@@ -668,8 +657,13 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
 
   // Create table
   const table = createUsageTable("Source/Model");
+  
+  const settings = loadSettings();
+  const filteredEntries = settings.includeUnusedModels 
+    ? report.entries 
+    : report.entries.filter(e => e.input + e.output + e.cacheRead + e.cacheWrite > 0);
 
-  for (const entry of report.entries) {
+  for (const entry of filteredEntries) {
     const sourceLabel = getSourceLabel(entry.source);
     const modelDisplay = `${pc.dim(sourceLabel)} ${formatModelName(entry.model)}`;
     table.push(
@@ -721,9 +715,7 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
   console.log();
 }
 
-async function showMonthlyReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }) {
-  logNativeStatus();
-
+async function showMonthlyReport(options: FilterOptions & DateFilterOptions & { benchmark?: boolean }, extraOptions?: { spinner?: boolean }) {
   const dateRange = getDateRangeLabel(options);
   const title = dateRange 
     ? `Monthly Token Usage Report (${dateRange})`
@@ -735,45 +727,55 @@ async function showMonthlyReport(options: FilterOptions & DateFilterOptions & { 
   }
   console.log();
 
-  // Start spinner for loading phase
-  const spinner = createSpinner({ color: "cyan" });
-  spinner.start(pc.gray("Loading data sources..."));
+  const useSpinner = extraOptions?.spinner !== false;
+  const spinner = useSpinner ? createSpinner({ color: "cyan" }) : null;
 
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
-  // Filter out cursor for local parsing (it's synced separately via network)
   const localSources: SourceType[] = (enabledSources || ['opencode', 'claude', 'codex', 'gemini', 'cursor', 'amp', 'droid'])
     .filter(s => s !== 'cursor');
   const includeCursor = !enabledSources || enabledSources.includes('cursor');
 
-  // Two-phase parallel loading: network (Cursor + pricing) overlaps with local file parsing
-  const { fetcher, cursorSync, localMessages } = await loadDataSourcesParallel(localSources, dateFilters);
+  spinner?.start(pc.gray("Scanning session data..."));
+
+  const { cursorSync, localMessages } = await loadDataSourcesParallel(
+    localSources,
+    dateFilters,
+    (phase) => spinner?.update(phase)
+  );
   
   if (!localMessages) {
-    spinner.error('Failed to parse local session files');
+    if (spinner) {
+      spinner.error('Failed to parse local session files');
+    } else {
+      console.error('Failed to parse local session files');
+    }
     process.exit(1);
   }
 
-  spinner.update(pc.gray("Finalizing report..."));
+  spinner?.update(pc.gray("Finalizing report..."));
   const startTime = performance.now();
 
   let report: MonthlyReport;
   try {
     report = await finalizeMonthlyReportAsync({
       localMessages,
-      pricing: fetcher.toPricingEntries(),
       includeCursor: includeCursor && cursorSync.synced,
       since: dateFilters.since,
       until: dateFilters.until,
       year: dateFilters.year,
     });
   } catch (e) {
-    spinner.error(`Error: ${(e as Error).message}`);
+    if (spinner) {
+      spinner.error(`Error: ${(e as Error).message}`);
+    } else {
+      console.error(`Error: ${(e as Error).message}`);
+    }
     process.exit(1);
   }
 
   const processingTime = performance.now() - startTime;
-  spinner.stop();
+  spinner?.stop();
 
   if (report.entries.length === 0) {
     console.log(pc.yellow("  No usage data found.\n"));
@@ -783,7 +785,12 @@ async function showMonthlyReport(options: FilterOptions & DateFilterOptions & { 
   // Create table
   const table = createUsageTable("Month");
 
-  for (const entry of report.entries) {
+  const settings = loadSettings();
+  const filteredEntries = settings.includeUnusedModels
+    ? report.entries
+    : report.entries.filter(e => e.input + e.output + e.cacheRead + e.cacheWrite > 0);
+
+  for (const entry of filteredEntries) {
     table.push(
       formatUsageRow(
         entry.month,
@@ -830,8 +837,6 @@ async function outputJsonReport(
   reportType: JsonReportType,
   options: FilterOptions & DateFilterOptions
 ) {
-  logNativeStatus();
-
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
   const onlyCursor = enabledSources?.length === 1 && enabledSources[0] === 'cursor';
@@ -839,7 +844,7 @@ async function outputJsonReport(
   const localSources: SourceType[] = (enabledSources || ['opencode', 'claude', 'codex', 'gemini', 'cursor', 'amp', 'droid'])
     .filter(s => s !== 'cursor');
 
-  const { fetcher, cursorSync, localMessages } = await loadDataSourcesParallel(
+  const { cursorSync, localMessages } = await loadDataSourcesParallel(
     onlyCursor ? [] : localSources,
     dateFilters
   );
@@ -854,7 +859,6 @@ async function outputJsonReport(
   if (reportType === "models") {
     const report = await finalizeReportAsync({
       localMessages: localMessages || emptyMessages,
-      pricing: fetcher.toPricingEntries(),
       includeCursor: includeCursor && cursorSync.synced,
       since: dateFilters.since,
       until: dateFilters.until,
@@ -864,7 +868,6 @@ async function outputJsonReport(
   } else {
     const report = await finalizeMonthlyReportAsync({
       localMessages: localMessages || emptyMessages,
-      pricing: fetcher.toPricingEntries(),
       includeCursor: includeCursor && cursorSync.synced,
       since: dateFilters.since,
       until: dateFilters.until,
@@ -877,24 +880,26 @@ async function outputJsonReport(
 interface GraphCommandOptions extends FilterOptions, DateFilterOptions {
   output?: string;
   benchmark?: boolean;
+  spinner?: boolean;
 }
 
 async function handleGraphCommand(options: GraphCommandOptions) {
-  logNativeStatus();
-
-  // Start spinner for loading phase (only if outputting to file, not stdout)
-  const spinner = options.output ? createSpinner({ color: "cyan" }) : null;
-  spinner?.start(pc.gray("Loading data sources..."));
+  const useSpinner = options.output && options.spinner !== false;
+  const spinner = useSpinner ? createSpinner({ color: "cyan" }) : null;
 
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
-  // Filter out cursor for local parsing (it's synced separately via network)
   const localSources: SourceType[] = (enabledSources || ['opencode', 'claude', 'codex', 'gemini', 'cursor', 'amp', 'droid'])
     .filter(s => s !== 'cursor');
   const includeCursor = !enabledSources || enabledSources.includes('cursor');
 
-  // Two-phase parallel loading: network (Cursor + pricing) overlaps with local file parsing
-  const { fetcher, cursorSync, localMessages } = await loadDataSourcesParallel(localSources, dateFilters);
+  spinner?.start(pc.gray("Scanning session data..."));
+
+  const { cursorSync, localMessages } = await loadDataSourcesParallel(
+    localSources,
+    dateFilters,
+    (phase) => spinner?.update(phase)
+  );
   
   if (!localMessages) {
     spinner?.error('Failed to parse local session files');
@@ -906,7 +911,6 @@ async function handleGraphCommand(options: GraphCommandOptions) {
 
   const data = await finalizeGraphAsync({
     localMessages,
-    pricing: fetcher.toPricingEntries(),
     includeCursor: includeCursor && cursorSync.synced,
     since: dateFilters.since,
     until: dateFilters.until,
@@ -985,6 +989,114 @@ async function handleWrappedCommand(options: WrappedCommandOptions) {
     }
     process.exit(1);
   }
+}
+
+async function handlePricingCommand(modelId: string, options: { json?: boolean; provider?: string; spinner?: boolean }) {
+  const validProviders = ["litellm", "openrouter"];
+  if (options.provider && !validProviders.includes(options.provider.toLowerCase())) {
+    console.log(pc.red(`\n  Invalid provider: ${options.provider}`));
+    console.log(pc.gray(`  Valid providers: ${validProviders.join(", ")}\n`));
+    process.exit(1);
+  }
+
+  const useSpinner = options.spinner !== false;
+  const spinner = useSpinner ? createSpinner({ color: "cyan" }) : null;
+  const providerLabel = options.provider ? ` from ${options.provider}` : "";
+  spinner?.start(pc.gray(`Fetching pricing data${providerLabel}...`));
+
+  let core: typeof import("@tokscale/core");
+  try {
+    const mod = await import("@tokscale/core");
+    core = (mod.default ?? mod) as typeof import("@tokscale/core");
+  } catch (importErr) {
+    spinner?.stop();
+    const errorMsg = (importErr as Error).message || "Unknown error";
+    if (options.json) {
+      console.log(JSON.stringify({ error: "Native module not available", details: errorMsg }, null, 2));
+    } else {
+      console.log(pc.red(`\n  Native module not available: ${errorMsg}`));
+      console.log(pc.gray("  Run 'bun run build:core' to build the native module.\n"));
+    }
+    process.exit(1);
+  }
+
+  try {
+    const provider = options.provider?.toLowerCase() || undefined;
+    const nativeResult = await core.lookupPricing(modelId, provider);
+    spinner?.stop();
+
+    const result = {
+      matchedKey: nativeResult.matchedKey,
+      source: nativeResult.source as "litellm" | "openrouter",
+      pricing: {
+        input_cost_per_token: nativeResult.pricing.inputCostPerToken,
+        output_cost_per_token: nativeResult.pricing.outputCostPerToken,
+        cache_read_input_token_cost: nativeResult.pricing.cacheReadInputTokenCost,
+        cache_creation_input_token_cost: nativeResult.pricing.cacheCreationInputTokenCost,
+      },
+    };
+
+    if (options.json) {
+      console.log(JSON.stringify({
+        modelId,
+        matchedKey: result.matchedKey,
+        source: result.source,
+        pricing: {
+          inputCostPerToken: result.pricing.input_cost_per_token ?? 0,
+          outputCostPerToken: result.pricing.output_cost_per_token ?? 0,
+          cacheReadInputTokenCost: result.pricing.cache_read_input_token_cost,
+          cacheCreationInputTokenCost: result.pricing.cache_creation_input_token_cost,
+        },
+      }, null, 2));
+    } else {
+      const sourceLabel = result.source.toLowerCase() === "litellm" ? pc.blue("LiteLLM") : pc.magenta("OpenRouter");
+      const inputCost = result.pricing.input_cost_per_token ?? 0;
+      const outputCost = result.pricing.output_cost_per_token ?? 0;
+      const cacheReadCost = result.pricing.cache_read_input_token_cost;
+      const cacheWriteCost = result.pricing.cache_creation_input_token_cost;
+
+      console.log(pc.cyan(`\n  Pricing for: ${pc.white(modelId)}`));
+      console.log(pc.gray(`  Matched key: ${result.matchedKey}`));
+      console.log(pc.gray(`  Source: `) + sourceLabel);
+      console.log();
+      console.log(pc.white(`  Input:  `) + formatPricePerMillion(inputCost));
+      console.log(pc.white(`  Output: `) + formatPricePerMillion(outputCost));
+      if (cacheReadCost !== undefined) {
+        console.log(pc.white(`  Cache Read:  `) + formatPricePerMillion(cacheReadCost));
+      }
+      if (cacheWriteCost !== undefined) {
+        console.log(pc.white(`  Cache Write: `) + formatPricePerMillion(cacheWriteCost));
+      }
+      console.log();
+    }
+  } catch (err) {
+    spinner?.stop();
+    const errorMsg = (err as Error).message || "Unknown error";
+    
+    // Check if this is a "model not found" error from Rust or a different error
+    const isModelNotFound = errorMsg.toLowerCase().includes("not found") || 
+                            errorMsg.toLowerCase().includes("no pricing");
+    
+    if (options.json) {
+      if (isModelNotFound) {
+        console.log(JSON.stringify({ error: "Model not found", modelId }, null, 2));
+      } else {
+        console.log(JSON.stringify({ error: errorMsg, modelId }, null, 2));
+      }
+    } else {
+      if (isModelNotFound) {
+        console.log(pc.red(`\n  Model not found: ${modelId}\n`));
+      } else {
+        console.log(pc.red(`\n  Error looking up pricing: ${errorMsg}\n`));
+      }
+    }
+    process.exit(1);
+  }
+}
+
+function formatPricePerMillion(costPerToken: number): string {
+  const perMillion = costPerToken * 1_000_000;
+  return pc.green(`$${perMillion.toFixed(2)}`) + pc.gray(" / 1M tokens");
 }
 
 function getSourceLabel(source: string): string {

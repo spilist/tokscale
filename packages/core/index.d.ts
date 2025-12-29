@@ -28,14 +28,13 @@ export interface DataSummary {
   models: Array<string>
 }
 
-/** Finalize graph with pricing */
-export declare function finalizeGraph(options: FinalizeGraphOptions): GraphResult
+/** Finalize graph */
+export declare function finalizeGraph(options: FinalizeGraphOptions): Promise<GraphResult>
 
 /** Options for finalizing graph */
 export interface FinalizeGraphOptions {
   homeDir?: string
   localMessages: ParsedMessages
-  pricing: Array<PricingEntry>
   includeCursor: boolean
   since?: string
   until?: string
@@ -46,24 +45,22 @@ export interface FinalizeGraphOptions {
 export interface FinalizeMonthlyOptions {
   homeDir?: string
   localMessages: ParsedMessages
-  pricing: Array<PricingEntry>
   includeCursor: boolean
   since?: string
   until?: string
   year?: string
 }
 
-/** Finalize monthly report with pricing */
-export declare function finalizeMonthlyReport(options: FinalizeMonthlyOptions): MonthlyReport
+/** Finalize monthly report */
+export declare function finalizeMonthlyReport(options: FinalizeMonthlyOptions): Promise<MonthlyReport>
 
 /** Finalize model report: apply pricing to local messages, add Cursor, aggregate */
-export declare function finalizeReport(options: FinalizeReportOptions): ModelReport
+export declare function finalizeReport(options: FinalizeReportOptions): Promise<ModelReport>
 
-/** Options for finalizing report with pricing */
+/** Options for finalizing report */
 export interface FinalizeReportOptions {
   homeDir?: string
   localMessages: ParsedMessages
-  pricing: Array<PricingEntry>
   includeCursor: boolean
   since?: string
   until?: string
@@ -82,13 +79,13 @@ export interface FinalizeReportOptions {
 export declare function generateGraph(options: GraphOptions): GraphResult
 
 /** Generate graph data with pricing calculation */
-export declare function generateGraphWithPricing(options: ReportOptions): GraphResult
+export declare function generateGraphWithPricing(options: ReportOptions): Promise<GraphResult>
 
 /** Get model usage report with pricing calculation */
-export declare function getModelReport(options: ReportOptions): ModelReport
+export declare function getModelReport(options: ReportOptions): Promise<ModelReport>
 
 /** Get monthly usage report with pricing calculation */
-export declare function getMonthlyReport(options: ReportOptions): MonthlyReport
+export declare function getMonthlyReport(options: ReportOptions): Promise<MonthlyReport>
 
 /** Metadata about the graph generation */
 export interface GraphMeta {
@@ -103,7 +100,7 @@ export interface GraphMeta {
 export interface GraphOptions {
   /** Home directory path (defaults to user's home) */
   homeDir?: string
-  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp" */
+  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp", "droid" */
   sources?: Array<string>
   /** Start date filter (YYYY-MM-DD) */
   since?: string
@@ -135,13 +132,7 @@ export interface LocalParseOptions {
   year?: string
 }
 
-/** Pricing data for a single model (passed from TypeScript) */
-export interface ModelPricing {
-  inputCostPerToken: number
-  outputCostPerToken: number
-  cacheReadInputTokenCost?: number
-  cacheCreationInputTokenCost?: number
-}
+export declare function lookupPricing(modelId: string, provider?: string | undefined | null): Promise<PricingLookupResult>
 
 /** Model report result */
 export interface ModelReport {
@@ -188,6 +179,13 @@ export interface MonthlyUsage {
   cost: number
 }
 
+export interface NativePricing {
+  inputCostPerToken: number
+  outputCostPerToken: number
+  cacheReadInputTokenCost?: number
+  cacheCreationInputTokenCost?: number
+}
+
 export interface ParsedMessage {
   source: string
   modelId: string
@@ -221,25 +219,19 @@ export interface ParsedMessages {
  */
 export declare function parseLocalSources(options: LocalParseOptions): ParsedMessages
 
-/** Entry in the pricing map */
-export interface PricingEntry {
+export interface PricingLookupResult {
   modelId: string
-  pricing: ModelPricing
+  matchedKey: string
+  source: string
+  pricing: NativePricing
 }
 
-/** Options for reports with pricing */
+/** Options for reports */
 export interface ReportOptions {
-  /** Home directory path (defaults to user's home) */
   homeDir?: string
-  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp" */
   sources?: Array<string>
-  /** Pricing data for cost calculation */
-  pricing: Array<PricingEntry>
-  /** Start date filter (YYYY-MM-DD) */
   since?: string
-  /** End date filter (YYYY-MM-DD) */
   until?: string
-  /** Filter to specific year */
   year?: string
 }
 

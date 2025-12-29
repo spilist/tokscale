@@ -12,7 +12,7 @@
     "build": "bun run build:core && bun run build:cli",
     "build:cli": "bun run --cwd packages/cli build",
     "build:core": "bun run --cwd packages/core build",
-    "cli": "bun run --cwd packages/cli dev",
+    "cli": "./scripts/cli.sh",
     "dev:frontend": "bun run --cwd packages/frontend dev",
     "dev:benchmarks": "bun run --cwd packages/benchmarks run"
   },

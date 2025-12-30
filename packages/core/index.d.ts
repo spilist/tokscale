@@ -57,6 +57,12 @@ export declare function finalizeMonthlyReport(options: FinalizeMonthlyOptions): 
 /** Finalize model report: apply pricing to local messages, add Cursor, aggregate */
 export declare function finalizeReport(options: FinalizeReportOptions): Promise<ModelReport>
 
+/**
+ * Finalize both report and graph in a single call with shared pricing
+ * This ensures consistent costs between report and graph data
+ */
+export declare function finalizeReportAndGraph(options: FinalizeReportOptions): Promise<ReportAndGraph>
+
 /** Options for finalizing report */
 export interface FinalizeReportOptions {
   homeDir?: string
@@ -66,17 +72,6 @@ export interface FinalizeReportOptions {
   until?: string
   year?: string
 }
-
-/**
- * Generate graph data from all session sources
- *
- * This is the main entry point that orchestrates:
- * 1. Parallel file scanning
- * 2. Parallel session parsing
- * 3. Date filtering
- * 4. Parallel aggregation
- */
-export declare function generateGraph(options: GraphOptions): GraphResult
 
 /** Generate graph data with pricing calculation */
 export declare function generateGraphWithPricing(options: ReportOptions): Promise<GraphResult>
@@ -94,22 +89,6 @@ export interface GraphMeta {
   dateRangeStart: string
   dateRangeEnd: string
   processingTimeMs: number
-}
-
-/** Configuration options for graph generation */
-export interface GraphOptions {
-  /** Home directory path (defaults to user's home) */
-  homeDir?: string
-  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp", "droid" */
-  sources?: Array<string>
-  /** Start date filter (YYYY-MM-DD) */
-  since?: string
-  /** End date filter (YYYY-MM-DD) */
-  until?: string
-  /** Filter to specific year */
-  year?: string
-  /** Number of parallel threads (defaults to CPU count) */
-  threads?: number
 }
 
 /** Complete graph result */
@@ -226,6 +205,12 @@ export interface PricingLookupResult {
   pricing: NativePricing
 }
 
+/** Combined result for report and graph (single pricing lookup) */
+export interface ReportAndGraph {
+  report: ModelReport
+  graph: GraphResult
+}
+
 /** Options for reports */
 export interface ReportOptions {
   homeDir?: string
@@ -233,21 +218,6 @@ export interface ReportOptions {
   since?: string
   until?: string
   year?: string
-}
-
-/** Scan for session files (for debugging/testing) */
-export declare function scanSessions(homeDir?: string | undefined | null, sources?: Array<string> | undefined | null): ScanStats
-
-/** Scan session files and return file counts per source */
-export interface ScanStats {
-  opencodeFiles: number
-  claudeFiles: number
-  codexFiles: number
-  geminiFiles: number
-  cursorFiles: number
-  ampFiles: number
-  droidFiles: number
-  totalFiles: number
 }
 
 /** Source contribution for a specific day */

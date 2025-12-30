@@ -575,6 +575,7 @@ module.exports = nativeBinding
 module.exports.finalizeGraph = nativeBinding.finalizeGraph
 module.exports.finalizeMonthlyReport = nativeBinding.finalizeMonthlyReport
 module.exports.finalizeReport = nativeBinding.finalizeReport
+module.exports.finalizeReportAndGraph = nativeBinding.finalizeReportAndGraph
 module.exports.generateGraph = nativeBinding.generateGraph
 module.exports.generateGraphWithPricing = nativeBinding.generateGraphWithPricing
 module.exports.getModelReport = nativeBinding.getModelReport

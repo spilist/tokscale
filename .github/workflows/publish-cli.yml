@@ -185,6 +185,17 @@ jobs:
           path: packages/core/*.node
           if-no-files-found: error
 
+      # Upload generated JS files from first build only (ubuntu x86_64-gnu)
+      - name: Upload generated NAPI files
+        if: matrix.settings.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: napi-generated
+          path: |
+            packages/core/index.js
+            packages/core/index.d.ts
+          if-no-files-found: error
+
   publish-core:
     name: Publish @tokscale/core
     needs: [bump-versions, build]
@@ -220,6 +231,12 @@ jobs:
             cp "$dir"*.node . 2>/dev/null || true
           done
           ls -la *.node
+
+      - name: Download generated NAPI files
+        uses: actions/download-artifact@v4
+        with:
+          name: napi-generated
+          path: packages/core/
 
       - name: Publish @tokscale/core
         working-directory: packages/core
@@ -308,6 +325,12 @@ jobs:
           name: bumped-packages
           path: packages/
 
+      - name: Download generated NAPI files
+        uses: actions/download-artifact@v4
+        with:
+          name: napi-generated
+          path: packages/core/
+
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
@@ -318,7 +341,7 @@ jobs:
           NEW_VERSION="${{ needs.bump-versions.outputs.version }}"
           echo "📦 Committing version bump to $NEW_VERSION"
           
-          git add packages/core/package.json packages/cli/package.json packages/tokscale/package.json
+          git add packages/core/package.json packages/core/index.js packages/core/index.d.ts packages/cli/package.json packages/tokscale/package.json
           git commit -m "chore: bump version to $NEW_VERSION"
           git push
           

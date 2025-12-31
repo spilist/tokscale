@@ -74,7 +74,7 @@ export function GraphContainer({ data }: GraphContainerProps) {
     return recalculateIntensity(filtered);
   }, [filteredBySource.contributions, selectedYear]);
 
-  const maxCost = useMemo(() => Math.max(...yearContributions.map((c) => c.totals.cost), 0), [yearContributions]);
+  const maxTokens = useMemo(() => Math.max(...yearContributions.map((c) => c.totals.tokens), 0), [yearContributions]);
   const totalCost = useMemo(() => yearContributions.reduce((sum, c) => sum + c.totals.cost, 0), [yearContributions]);
   const totalTokens = useMemo(() => yearContributions.reduce((sum, c) => sum + c.totals.tokens, 0), [yearContributions]);
   const activeDays = useMemo(() => yearContributions.filter((c) => c.totals.cost > 0).length, [yearContributions]);
@@ -148,7 +148,7 @@ export function GraphContainer({ data }: GraphContainerProps) {
               contributions={yearContributions}
               palette={palette}
               year={selectedYear}
-              maxCost={maxCost}
+              maxTokens={maxTokens}
               totalCost={totalCost}
               totalTokens={totalTokens}
               activeDays={activeDays}

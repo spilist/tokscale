@@ -26,6 +26,11 @@ const MIN_FUZZY_MATCH_LEN: usize = 5;
 /// Note: OpenCode Zen uses -xhigh suffix for extra-high quality tier
 const TIER_SUFFIXES: &[&str] = &["-xhigh", "-low", "-high", "-medium", "-free", ":low", ":high", ":medium", ":free"];
 
+/// Model variant suffixes that can be stripped as a fallback when pricing isn't found.
+/// These represent model variants that typically share pricing with their base model.
+/// Order matters: suffixes are tried in order, and only the first match is used.
+const FALLBACK_SUFFIXES: &[&str] = &["-codex", "-codex-max"];
+
 #[derive(Clone)]
 struct CachedResult {
     pricing: ModelPricing,
@@ -112,25 +117,45 @@ impl PricingLookup {
     pub fn lookup_with_source(&self, model_id: &str, force_source: Option<&str>) -> Option<LookupResult> {
         let canonical = aliases::resolve_alias(model_id).unwrap_or(model_id);
         let lower = canonical.to_lowercase();
-        
-        let result = match force_source {
-            Some("litellm") => self.lookup_litellm_only(&lower),
-            Some("openrouter") => self.lookup_openrouter_only(&lower),
-            _ => self.lookup_auto(&lower),
+
+        // Helper to perform lookup with the given source constraint
+        let do_lookup = |id: &str| match force_source {
+            Some("litellm") => self.lookup_litellm_only(id),
+            Some("openrouter") => self.lookup_openrouter_only(id),
+            _ => self.lookup_auto(id),
         };
-        
-        if result.is_some() {
-            return result;
+
+        // Try direct lookup
+        if let Some(result) = do_lookup(&lower) {
+            return Some(result);
         }
-        
-        if let Some(stripped) = strip_tier_suffix(&lower) {
-            return match force_source {
-                Some("litellm") => self.lookup_litellm_only(stripped),
-                Some("openrouter") => self.lookup_openrouter_only(stripped),
-                _ => self.lookup_auto(stripped),
-            };
+
+        // Try stripping tier suffix (e.g., -high, -low)
+        if let Some(tier_stripped) = strip_tier_suffix(&lower) {
+            if let Some(result) = do_lookup(tier_stripped) {
+                return Some(result);
+            }
+            // Try fallback suffix on the tier-stripped version (e.g., gpt-5-codex-high -> gpt-5-codex -> gpt-5)
+            if let Some(fallback_stripped) = strip_fallback_suffix(tier_stripped) {
+                if let Some(result) = do_lookup(fallback_stripped) {
+                    return Some(result);
+                }
+            }
         }
-        
+
+        // Try stripping fallback suffixes (e.g., -codex variants falling back to base model)
+        if let Some(fallback_stripped) = strip_fallback_suffix(&lower) {
+            if let Some(result) = do_lookup(fallback_stripped) {
+                return Some(result);
+            }
+            // Also try tier suffix on the fallback-stripped version
+            if let Some(tier_stripped) = strip_tier_suffix(fallback_stripped) {
+                if let Some(result) = do_lookup(tier_stripped) {
+                    return Some(result);
+                }
+            }
+        }
+
         None
     }
     
@@ -516,6 +541,23 @@ fn is_fuzzy_eligible(model_id: &str) -> bool {
 
 fn strip_tier_suffix(model_id: &str) -> Option<&str> {
     for suffix in TIER_SUFFIXES {
+        if model_id.ends_with(suffix) {
+            return Some(&model_id[..model_id.len() - suffix.len()]);
+        }
+    }
+    None
+}
+
+/// Strips fallback suffixes from model IDs for pricing lookup.
+/// Returns the base model ID if a fallback suffix is found, None otherwise.
+/// Longer suffixes are checked first to handle cases like "-codex-max" before "-codex".
+fn strip_fallback_suffix(model_id: &str) -> Option<&str> {
+    // FALLBACK_SUFFIXES should be ordered with longer suffixes first,
+    // but we sort by length descending to be safe
+    let mut suffixes: Vec<&str> = FALLBACK_SUFFIXES.to_vec();
+    suffixes.sort_by(|a, b| b.len().cmp(&a.len()));
+
+    for suffix in suffixes {
         if model_id.ends_with(suffix) {
             return Some(&model_id[..model_id.len() - suffix.len()]);
         }
@@ -1165,7 +1207,100 @@ mod tests {
         assert_eq!(strip_tier_suffix("gpt-4o"), None);
         assert_eq!(strip_tier_suffix("claude-3-5-sonnet"), None);
     }
-    
+
+    #[test]
+    fn test_strip_fallback_suffix_fn() {
+        // Basic -codex suffix stripping
+        assert_eq!(strip_fallback_suffix("gpt-5-codex"), Some("gpt-5"));
+        assert_eq!(strip_fallback_suffix("gpt-5.1-codex"), Some("gpt-5.1"));
+        assert_eq!(strip_fallback_suffix("some-model-codex"), Some("some-model"));
+
+        // -codex-max should be stripped before -codex (longer suffix first)
+        assert_eq!(strip_fallback_suffix("gpt-5.1-codex-max"), Some("gpt-5.1"));
+
+        // No fallback suffix present
+        assert_eq!(strip_fallback_suffix("gpt-5"), None);
+        assert_eq!(strip_fallback_suffix("claude-3-5-sonnet"), None);
+        assert_eq!(strip_fallback_suffix("gpt-4o"), None);
+
+        // Suffix in middle doesn't match (must be at end)
+        assert_eq!(strip_fallback_suffix("codex-model"), None);
+    }
+
+    #[test]
+    fn test_fallback_suffix_lookup() {
+        // Create a lookup with only the base model (no -codex variant)
+        let mut litellm = HashMap::new();
+        litellm.insert("gpt-5".into(), ModelPricing {
+            input_cost_per_token: Some(0.00000125),
+            output_cost_per_token: Some(0.00001),
+            cache_read_input_token_cost: Some(1.25e-7),
+            cache_creation_input_token_cost: None,
+        });
+        // Note: gpt-5-codex is NOT in the pricing data
+
+        let lookup = PricingLookup::new(litellm, HashMap::new());
+
+        // Looking up gpt-5-codex should fall back to gpt-5
+        let result = lookup.lookup("gpt-5-codex").unwrap();
+        assert_eq!(result.matched_key, "gpt-5");
+        assert_eq!(result.source, "LiteLLM");
+
+        // Looking up gpt-5-codex-max should also fall back to gpt-5
+        let result = lookup.lookup("gpt-5-codex-max").unwrap();
+        assert_eq!(result.matched_key, "gpt-5");
+        assert_eq!(result.source, "LiteLLM");
+    }
+
+    #[test]
+    fn test_fallback_suffix_with_tier_suffix() {
+        // Test that tier suffix + fallback suffix both work together
+        let mut litellm = HashMap::new();
+        litellm.insert("gpt-5".into(), ModelPricing {
+            input_cost_per_token: Some(0.00000125),
+            output_cost_per_token: Some(0.00001),
+            cache_read_input_token_cost: Some(1.25e-7),
+            cache_creation_input_token_cost: None,
+        });
+
+        let lookup = PricingLookup::new(litellm, HashMap::new());
+
+        // gpt-5-codex-high should strip -high first, then fall back from gpt-5-codex to gpt-5
+        let result = lookup.lookup("gpt-5-codex-high").unwrap();
+        assert_eq!(result.matched_key, "gpt-5");
+        assert_eq!(result.source, "LiteLLM");
+
+        // gpt-5-codex-max-xhigh should strip -xhigh first, then fall back from gpt-5-codex-max to gpt-5
+        let result = lookup.lookup("gpt-5-codex-max-xhigh").unwrap();
+        assert_eq!(result.matched_key, "gpt-5");
+        assert_eq!(result.source, "LiteLLM");
+    }
+
+    #[test]
+    fn test_fallback_suffix_prefers_exact_match() {
+        // If the exact model exists, it should be used (no fallback)
+        let mut litellm = HashMap::new();
+        litellm.insert("gpt-5".into(), ModelPricing {
+            input_cost_per_token: Some(0.00000125),
+            output_cost_per_token: Some(0.00001),
+            cache_read_input_token_cost: None,
+            cache_creation_input_token_cost: None,
+        });
+        litellm.insert("gpt-5-codex".into(), ModelPricing {
+            input_cost_per_token: Some(0.000002), // Different price to verify which one is used
+            output_cost_per_token: Some(0.000015),
+            cache_read_input_token_cost: None,
+            cache_creation_input_token_cost: None,
+        });
+
+        let lookup = PricingLookup::new(litellm, HashMap::new());
+
+        // Should use the exact match, not fall back
+        let result = lookup.lookup("gpt-5-codex").unwrap();
+        assert_eq!(result.matched_key, "gpt-5-codex");
+        assert_eq!(result.pricing.input_cost_per_token, Some(0.000002));
+    }
+
     #[test]
     fn test_normalize_version_separator() {
         assert_eq!(normalize_version_separator("glm-4-7"), Some("glm-4.7".into()));

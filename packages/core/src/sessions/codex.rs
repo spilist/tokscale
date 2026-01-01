@@ -120,13 +120,17 @@ pub fn parse_codex_file(path: &Path) -> Vec<UnifiedMessage> {
             .unwrap_or_else(|| "unknown".to_string());
 
         // Calculate delta tokens
+        // Note: OpenAI's input_tokens INCLUDES cached tokens (they are a subset).
+        // We subtract cached from input to avoid double-counting when aggregating.
         let (input, output, cached) = if let Some(last) = &info.last_token_usage {
+            let total_input = last.input_tokens.unwrap_or(0);
+            let cached = last.cached_input_tokens
+                .or(last.cache_read_input_tokens)
+                .unwrap_or(0);
             (
-                last.input_tokens.unwrap_or(0),
+                total_input.saturating_sub(cached),
                 last.output_tokens.unwrap_or(0),
-                last.cached_input_tokens
-                    .or(last.cache_read_input_tokens)
-                    .unwrap_or(0),
+                cached,
             )
         } else if let (Some(total), Some(prev)) = (&info.total_token_usage, &previous_totals) {
             let curr_input = total.input_tokens.unwrap_or(0);
@@ -136,10 +140,12 @@ pub fn parse_codex_file(path: &Path) -> Vec<UnifiedMessage> {
                 .or(total.cache_read_input_tokens)
                 .unwrap_or(0);
 
+            let delta_input = (curr_input - prev.0).max(0);
+            let delta_cached = (curr_cached - prev.2).max(0);
             (
-                (curr_input - prev.0).max(0),
+                (delta_input - delta_cached).max(0),
                 (curr_output - prev.1).max(0),
-                (curr_cached - prev.2).max(0),
+                delta_cached,
             )
         } else {
             continue;

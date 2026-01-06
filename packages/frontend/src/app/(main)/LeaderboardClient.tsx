@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "nextjs-toploader/app";
 import styled from "styled-components";
 import { Pagination, Avatar } from "@primer/react";
+import { CopyIcon, CheckIcon } from "@primer/octicons-react";
 import { TabBar } from "@/components/TabBar";
 import { LeaderboardSkeleton } from "@/components/Skeleton";
 import { formatCurrency, formatNumber } from "@/lib/utils";
@@ -455,6 +456,30 @@ const CommandArg = styled.span`
   }
 `;
 
+const CopyIconButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  color: #4B6486;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 150ms;
+  flex-shrink: 0;
+
+  &:hover {
+    color: #FFF;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &.copied {
+    color: #3FB950;
+  }
+`;
+
 export type Period = "all" | "month" | "week";
 
 export interface LeaderboardUser {
@@ -508,6 +533,7 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
   const [data, setData] = useState<LeaderboardData>(initialData);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>(initialData.period);
   const [page, setPage] = useState(initialData.pagination.page);
 
@@ -552,6 +578,12 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
       setPage(data.pagination.totalPages);
     }
   }, [data.pagination.totalPages, page]);
+
+  const handleCopyCommand = (command: string) => {
+    navigator.clipboard.writeText(command);
+    setCopiedCommand(command);
+    setTimeout(() => setCopiedCommand(null), 2000);
+  };
 
   return (
     <>
@@ -819,12 +851,26 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
             <CommandPrefix>bunx</CommandPrefix>
             <CommandName>tokscale</CommandName>
             <CommandArg>login</CommandArg>
+            <CopyIconButton
+              onClick={() => handleCopyCommand("bunx tokscale login")}
+              className={copiedCommand === "bunx tokscale login" ? "copied" : ""}
+              aria-label="Copy command"
+            >
+              {copiedCommand === "bunx tokscale login" ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+            </CopyIconButton>
           </CodeLine>
           <CodeLine style={{ backgroundColor: "var(--color-bg-subtle)" }}>
             <CommandPrompt>$</CommandPrompt>
             <CommandPrefix>bunx</CommandPrefix>
             <CommandName>tokscale</CommandName>
             <CommandArg>submit</CommandArg>
+            <CopyIconButton
+              onClick={() => handleCopyCommand("bunx tokscale submit")}
+              className={copiedCommand === "bunx tokscale submit" ? "copied" : ""}
+              aria-label="Copy command"
+            >
+              {copiedCommand === "bunx tokscale submit" ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+            </CopyIconButton>
           </CodeLine>
         </CodeBlock>
       </CTASection>

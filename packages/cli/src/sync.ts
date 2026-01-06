@@ -120,7 +120,7 @@ function buildCronEntry(): string {
   const { path } = getTokscalePath();
   const tokscalePath = escapePathForShell(path);
   const logPath = escapePathForShell(LOG_FILE);
-  return `0 * * * * '${tokscalePath}' submit --quiet >> '${logPath}' 2>&1 ${CRON_MARKER}`;
+  return `0 * * * * '${tokscalePath}' submit >> '${logPath}' 2>&1 ${CRON_MARKER}`;
 }
 
 function setupCrontab(): { success: boolean; error?: string } {
@@ -189,7 +189,7 @@ function setupWindowsTask(): { success: boolean; error?: string } {
       // Task doesn't exist yet
     }
     
-    const scriptContent = `@echo off\r\n"${tokscalePath}" submit --quiet >> "${LOG_FILE}" 2>&1\r\n`;
+    const scriptContent = `@echo off\r\n"${tokscalePath}" submit >> "${LOG_FILE}" 2>&1\r\n`;
     fs.writeFileSync(WINDOWS_SCRIPT_FILE, scriptContent);
     
     // Use cmd.exe /c wrapper for robustness with Task Scheduler
@@ -296,7 +296,7 @@ export async function setupSync(_options: SyncSetupOptions = {}): Promise<void> 
     console.log(pc.green("\n  Success! Automatic sync is now configured."));
     console.log();
     console.log(pc.white("  Schedule: Hourly (at minute 0)"));
-    console.log(pc.white("  Command: tokscale submit --quiet"));
+    console.log(pc.white("  Command: tokscale submit"));
     if (isWindows()) {
       console.log(pc.gray(`  Script: ${WINDOWS_SCRIPT_FILE}`));
     }

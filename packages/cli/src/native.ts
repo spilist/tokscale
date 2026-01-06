@@ -2,48 +2,18 @@
  * Native module loader for Rust core
  *
  * Exposes all Rust functions with proper TypeScript types.
- * Falls back to TypeScript implementations when native module is unavailable.
+ * Native module is REQUIRED - no TypeScript fallback.
  */
 
-import type { PricingEntry } from "./pricing.js";
 import type {
   TokenContributionData,
   GraphOptions as TSGraphOptions,
   SourceType,
 } from "./graph-types.js";
-import {
-  parseLocalSources as parseLocalSourcesTS,
-  type ParsedMessages as TSParsedMessages,
-  type UnifiedMessage,
-} from "./sessions/index.js";
-import {
-  generateModelReport as generateModelReportTS,
-  generateMonthlyReport as generateMonthlyReportTS,
-  generateGraphData as generateGraphDataTS,
-} from "./sessions/reports.js";
-import { readCursorMessagesFromCache } from "./cursor.js";
 
 // =============================================================================
 // Types matching Rust exports
 // =============================================================================
-
-interface NativeGraphOptions {
-  homeDir?: string;
-  sources?: string[];
-  since?: string;
-  until?: string;
-  year?: string;
-  threads?: number;
-}
-
-interface NativeScanStats {
-  opencodeFiles: number;
-  claudeFiles: number;
-  codexFiles: number;
-  geminiFiles: number;
-  ampFiles: number;
-  totalFiles: number;
-}
 
 interface NativeTokenBreakdown {
   input: number;
@@ -110,21 +80,9 @@ interface NativeGraphResult {
   contributions: NativeDailyContribution[];
 }
 
-// Types for pricing-aware APIs
-interface NativePricingEntry {
-  modelId: string;
-  pricing: {
-    inputCostPerToken: number;
-    outputCostPerToken: number;
-    cacheReadInputTokenCost?: number;
-    cacheCreationInputTokenCost?: number;
-  };
-}
-
 interface NativeReportOptions {
   homeDir?: string;
   sources?: string[];
-  pricing: NativePricingEntry[];
   since?: string;
   until?: string;
   year?: string;
@@ -194,6 +152,7 @@ interface NativeParsedMessages {
   codexCount: number;
   geminiCount: number;
   ampCount: number;
+  droidCount?: number;
   processingTimeMs: number;
 }
 
@@ -208,7 +167,6 @@ interface NativeLocalParseOptions {
 interface NativeFinalizeReportOptions {
   homeDir?: string;
   localMessages: NativeParsedMessages;
-  pricing: NativePricingEntry[];
   includeCursor: boolean;
   since?: string;
   until?: string;
@@ -218,12 +176,6 @@ interface NativeFinalizeReportOptions {
 interface NativeCore {
   version(): string;
   healthCheck(): string;
-  generateGraph(options: NativeGraphOptions): NativeGraphResult;
-  generateGraphWithPricing(options: NativeReportOptions): NativeGraphResult;
-  scanSessions(homeDir?: string, sources?: string[]): NativeScanStats;
-  getModelReport(options: NativeReportOptions): NativeModelReport;
-  getMonthlyReport(options: NativeReportOptions): NativeMonthlyReport;
-  // Two-phase processing (parallel optimization)
   parseLocalSources(options: NativeLocalParseOptions): NativeParsedMessages;
   finalizeReport(options: NativeFinalizeReportOptions): NativeModelReport;
   finalizeMonthlyReport(options: NativeFinalizeReportOptions): NativeMonthlyReport;
@@ -238,7 +190,11 @@ let nativeCore: NativeCore | null = null;
 let loadError: Error | null = null;
 
 try {
-  nativeCore = await import("@tokscale/core").then((m) => m.default || m);
+  // Type assertion needed because dynamic import returns module namespace
+  // nativeCore.version() is called directly, async functions go through subprocess
+  nativeCore = await import("@tokscale/core").then(
+    (m) => (m.default || m) as unknown as NativeCore
+  );
 } catch (e) {
   loadError = e as Error;
 }
@@ -255,44 +211,10 @@ export function isNativeAvailable(): boolean {
 }
 
 /**
- * Get native module load error (if any)
- */
-export function getNativeLoadError(): Error | null {
-  return loadError;
-}
-
-/**
  * Get native module version
  */
 export function getNativeVersion(): string | null {
   return nativeCore?.version() ?? null;
-}
-
-/**
- * Scan sessions using native module
- */
-export function scanSessionsNative(homeDir?: string, sources?: string[]): NativeScanStats | null {
-  if (!nativeCore) {
-    return null;
-  }
-  return nativeCore.scanSessions(homeDir, sources);
-}
-
-// =============================================================================
-// Graph generation
-// =============================================================================
-
-/**
- * Convert TypeScript graph options to native format
- */
-function toNativeOptions(options: TSGraphOptions): NativeGraphOptions {
-  return {
-    homeDir: undefined,
-    sources: options.sources,
-    since: options.since,
-    until: options.until,
-    year: options.year,
-  };
 }
 
 /**
@@ -359,22 +281,6 @@ function fromNativeResult(result: NativeGraphResult): TokenContributionData {
     })),
   };
 }
-
-/**
- * Generate graph data using native module (without pricing - uses embedded costs)
- * @deprecated Use generateGraphWithPricing instead
- */
-export function generateGraphNative(options: TSGraphOptions = {}): TokenContributionData {
-  if (!nativeCore) {
-    throw new Error("Native module not available: " + (loadError?.message || "unknown error"));
-  }
-
-  const nativeOptions = toNativeOptions(options);
-  const result = nativeCore.generateGraph(nativeOptions);
-  return fromNativeResult(result);
-}
-
-
 
 // =============================================================================
 // Reports
@@ -445,6 +351,7 @@ export interface ParsedMessages {
   codexCount: number;
   geminiCount: number;
   ampCount: number;
+  droidCount: number;
   processingTimeMs: number;
 }
 
@@ -453,13 +360,10 @@ export interface LocalParseOptions {
   since?: string;
   until?: string;
   year?: string;
-  /** Force TypeScript fallback even when native module is available (needed for agent field) */
-  forceTypescript?: boolean;
 }
 
 export interface FinalizeOptions {
   localMessages: ParsedMessages;
-  pricing: PricingEntry[];
   includeCursor: boolean;
   since?: string;
   until?: string;
@@ -474,6 +378,9 @@ export interface FinalizeOptions {
 
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -492,7 +399,6 @@ const MAX_OUTPUT_BYTES = parseInt(
 );
 
 interface BunSubprocess {
-  stdin: { write: (data: string) => void; end: () => void };
   stdout: { text: () => Promise<string> };
   stderr: { text: () => Promise<string> };
   exited: Promise<number>;
@@ -502,7 +408,6 @@ interface BunSubprocess {
 }
 
 interface BunSpawnOptions {
-  stdin: string;
   stdout: string;
   stderr: string;
 }
@@ -521,16 +426,22 @@ async function runInSubprocess<T>(method: string, args: unknown[]): Promise<T> {
   const runnerPath = join(__dirname, "native-runner.js");
   const input = JSON.stringify({ method, args });
 
+  const tmpDir = join(tmpdir(), "tokscale");
+  mkdirSync(tmpDir, { recursive: true });
+  const inputFile = join(tmpDir, `input-${randomUUID()}.json`);
+  
+  writeFileSync(inputFile, input, "utf-8");
+
   const BunGlobal = (globalThis as Record<string, unknown>).Bun as BunGlobalType;
 
   let proc: BunSubprocess;
   try {
-    proc = BunGlobal.spawn([process.execPath, runnerPath], {
-      stdin: "pipe",
+    proc = BunGlobal.spawn([process.execPath, runnerPath, inputFile], {
       stdout: "pipe",
       stderr: "pipe",
     });
   } catch (e) {
+    unlinkSync(inputFile);
     throw new Error(`Failed to spawn subprocess: ${(e as Error).message}`);
   }
 
@@ -542,6 +453,7 @@ async function runInSubprocess<T>(method: string, args: unknown[]): Promise<T> {
   const cleanup = async () => {
     if (timeoutId) clearTimeout(timeoutId);
     if (sigkillId) clearTimeout(sigkillId);
+    try { unlinkSync(inputFile); } catch {}
     if (aborted) {
       safeKill(proc, "SIGKILL");
       await proc.exited.catch(() => {});
@@ -554,9 +466,6 @@ async function runInSubprocess<T>(method: string, args: unknown[]): Promise<T> {
   };
 
   try {
-    proc.stdin.write(input);
-    proc.stdin.end();
-
     const stdoutChunks: Uint8Array[] = [];
     const stderrChunks: Uint8Array[] = [];
     let stdoutBytes = 0;
@@ -644,37 +553,8 @@ async function runInSubprocess<T>(method: string, args: unknown[]): Promise<T> {
 }
 
 export async function parseLocalSourcesAsync(options: LocalParseOptions): Promise<ParsedMessages> {
-  // Use TypeScript fallback when native module is not available or when explicitly requested
-  if (!isNativeAvailable() || options.forceTypescript) {
-    const result = parseLocalSourcesTS({
-      sources: options.sources,
-      since: options.since,
-      until: options.until,
-      year: options.year,
-    });
-
-    return {
-      messages: result.messages.map((msg) => ({
-        source: msg.source,
-        modelId: msg.modelId,
-        providerId: msg.providerId,
-        timestamp: msg.timestamp,
-        date: msg.date,
-        input: msg.tokens.input,
-        output: msg.tokens.output,
-        cacheRead: msg.tokens.cacheRead,
-        cacheWrite: msg.tokens.cacheWrite,
-        reasoning: msg.tokens.reasoning,
-        sessionId: msg.sessionId,
-        agent: msg.agent,
-      })),
-      opencodeCount: result.opencodeCount,
-      claudeCount: result.claudeCount,
-      codexCount: result.codexCount,
-      geminiCount: result.geminiCount,
-      ampCount: result.ampCount,
-      processingTimeMs: result.processingTimeMs,
-    };
+  if (!isNativeAvailable()) {
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeLocalParseOptions = {
@@ -688,52 +568,14 @@ export async function parseLocalSourcesAsync(options: LocalParseOptions): Promis
   return runInSubprocess<ParsedMessages>("parseLocalSources", [nativeOptions]);
 }
 
-function buildMessagesForFallback(options: FinalizeOptions): UnifiedMessage[] {
-  const messages: UnifiedMessage[] = options.localMessages.messages.map((msg) => ({
-    source: msg.source,
-    modelId: msg.modelId,
-    providerId: msg.providerId,
-    sessionId: msg.sessionId,
-    timestamp: msg.timestamp,
-    date: msg.date,
-    tokens: {
-      input: msg.input,
-      output: msg.output,
-      cacheRead: msg.cacheRead,
-      cacheWrite: msg.cacheWrite,
-      reasoning: msg.reasoning,
-    },
-    cost: 0,
-    agent: msg.agent,
-  }));
-
-  if (options.includeCursor) {
-    const cursorMessages = readCursorMessagesFromCache();
-    for (const cursor of cursorMessages) {
-      const inRange =
-        (!options.year || cursor.date.startsWith(options.year)) &&
-        (!options.since || cursor.date >= options.since) &&
-        (!options.until || cursor.date <= options.until);
-      if (inRange) {
-        messages.push(cursor);
-      }
-    }
-  }
-
-  return messages;
-}
-
 export async function finalizeReportAsync(options: FinalizeOptions): Promise<ModelReport> {
   if (!isNativeAvailable()) {
-    const startTime = performance.now();
-    const messages = buildMessagesForFallback(options);
-    return generateModelReportTS(messages, options.pricing, startTime);
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeFinalizeReportOptions = {
     homeDir: undefined,
     localMessages: options.localMessages,
-    pricing: options.pricing,
     includeCursor: options.includeCursor,
     since: options.since,
     until: options.until,
@@ -745,15 +587,12 @@ export async function finalizeReportAsync(options: FinalizeOptions): Promise<Mod
 
 export async function finalizeMonthlyReportAsync(options: FinalizeOptions): Promise<MonthlyReport> {
   if (!isNativeAvailable()) {
-    const startTime = performance.now();
-    const messages = buildMessagesForFallback(options);
-    return generateMonthlyReportTS(messages, options.pricing, startTime);
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeFinalizeReportOptions = {
     homeDir: undefined,
     localMessages: options.localMessages,
-    pricing: options.pricing,
     includeCursor: options.includeCursor,
     since: options.since,
     until: options.until,
@@ -765,15 +604,12 @@ export async function finalizeMonthlyReportAsync(options: FinalizeOptions): Prom
 
 export async function finalizeGraphAsync(options: FinalizeOptions): Promise<TokenContributionData> {
   if (!isNativeAvailable()) {
-    const startTime = performance.now();
-    const messages = buildMessagesForFallback(options);
-    return generateGraphDataTS(messages, options.pricing, startTime);
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
   const nativeOptions: NativeFinalizeReportOptions = {
     homeDir: undefined,
     localMessages: options.localMessages,
-    pricing: options.pricing,
     includeCursor: options.includeCursor,
     since: options.since,
     until: options.until,
@@ -784,33 +620,33 @@ export async function finalizeGraphAsync(options: FinalizeOptions): Promise<Toke
   return fromNativeResult(result);
 }
 
-export async function generateGraphWithPricingAsync(
-  options: TSGraphOptions & { pricing: PricingEntry[] }
-): Promise<TokenContributionData> {
-  // Use TypeScript fallback when native module is not available
+export interface ReportAndGraph {
+  report: ModelReport;
+  graph: TokenContributionData;
+}
+
+interface NativeReportAndGraph {
+  report: NativeModelReport;
+  graph: NativeGraphResult;
+}
+
+export async function finalizeReportAndGraphAsync(options: FinalizeOptions): Promise<ReportAndGraph> {
   if (!isNativeAvailable()) {
-    const startTime = performance.now();
-
-    // Parse local sources using TS fallback
-    const parsed = parseLocalSourcesTS({
-      sources: options.sources,
-      since: options.since,
-      until: options.until,
-      year: options.year,
-    });
-
-    return generateGraphDataTS(parsed.messages, options.pricing, startTime);
+    throw new Error("Native module required. Run: bun run build:core");
   }
 
-  const nativeOptions: NativeReportOptions = {
+  const nativeOptions: NativeFinalizeReportOptions = {
     homeDir: undefined,
-    sources: options.sources,
-    pricing: options.pricing,
+    localMessages: options.localMessages,
+    includeCursor: options.includeCursor,
     since: options.since,
     until: options.until,
     year: options.year,
   };
 
-  const result = await runInSubprocess<NativeGraphResult>("generateGraphWithPricing", [nativeOptions]);
-  return fromNativeResult(result);
+  const result = await runInSubprocess<NativeReportAndGraph>("finalizeReportAndGraph", [nativeOptions]);
+  return {
+    report: result.report,
+    graph: fromNativeResult(result.graph),
+  };
 }

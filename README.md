@@ -18,7 +18,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/junhoyeo/tokscale?color=0073FF&labelColor=black&style=flat-square)](https://github.com/junhoyeo/tokscale/issues)
 [![License](https://img.shields.io/badge/license-MIT-white?labelColor=black&style=flat-square)](https://github.com/junhoyeo/tokscale/blob/master/LICENSE)
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+[🇺🇸 English](README.md) | [🇰🇷 한국어](README.ko.md) | [🇯🇵 日本語](README.ja.md) | [🇨🇳 简体中文](README.zh-cn.md)
 
 </div>
 
@@ -38,42 +38,6 @@
 
 > **Run [`bunx tokscale@latest submit`](#social) to submit your usage data to the leaderboard and create your public profile!**
 
-## Contents
-
-- [Overview](#overview)
-  - [Why "Tokscale"?](#why-tokscale)
-- [Features](#features)
-- [Installation](#installation)
-  - [Quick Start](#quick-start)
-  - [Prerequisites](#prerequisites)
-  - [Development Setup](#development-setup)
-  - [Building the Native Module (Optional)](#building-the-native-module-optional)
-- [Usage](#usage)
-  - [Basic Commands](#basic-commands)
-  - [TUI Features](#tui-features)
-  - [Filtering by Platform](#filtering-by-platform)
-  - [Date Filtering](#date-filtering)
-  - [Social](#social)
-  - [Automatic Sync](#automatic-sync)
-  - [Cursor IDE Commands](#cursor-ide-commands)
-  - [Environment Variables](#environment-variables)
-- [Frontend Visualization](#frontend-visualization)
-  - [Features](#features-1)
-  - [Running the Frontend](#running-the-frontend)
-- [Social Platform](#social-platform)
-  - [Features](#features-2)
-  - [Getting Started](#getting-started)
-  - [Data Validation](#data-validation)
-- [Wrapped 2025](#wrapped-2025)
-- [Development](#development)
-- [Supported Platforms](#supported-platforms)
-- [Session Data Retention](#session-data-retention)
-- [Data Sources](#data-sources)
-- [Pricing](#pricing)
-- [Contributing](#contributing)
-- [Acknowledgments](#acknowledgments)
-- [License](#license)
-
 ## Overview
 
 **Tokscale** helps you monitor and analyze your token consumption from:
@@ -85,7 +49,8 @@
 | <img width="48px" src=".github/assets/client-openai.jpg" alt="Codex" /> | [Codex CLI](https://github.com/openai/codex) | `~/.codex/sessions/` | ✅ Yes |
 | <img width="48px" src=".github/assets/client-gemini.png" alt="Gemini" /> | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `~/.gemini/tmp/*/chats/` | ✅ Yes |
 | <img width="48px" src=".github/assets/client-cursor.jpg" alt="Cursor" /> | [Cursor IDE](https://cursor.com/) | API sync via `~/.config/tokscale/cursor-cache/` | ✅ Yes |
-| <img width="48px" src=".github/assets/amp.png" alt="Amp" /> | [Amp](https://ampcode.com/) | `~/.local/share/amp/threads/` | ✅ Yes / from `v1.0.18` (next release) |
+| <img width="48px" src=".github/assets/client-amp.png" alt="Amp" /> | [Amp (AmpCode)](https://ampcode.com/) | `~/.local/share/amp/threads/` | ✅ Yes |
+| <img width="48px" src=".github/assets/client-droid.png" alt="Droid" /> | [Droid (Factory Droid)](https://factory.ai/) | `~/.factory/sessions/` | ✅ Yes |
 
 Get real-time pricing calculations using [🚅 LiteLLM's pricing data](https://github.com/BerriAI/litellm), with support for tiered pricing models and cache token discounts.
 
@@ -94,6 +59,52 @@ Get real-time pricing calculations using [🚅 LiteLLM's pricing data](https://g
 This project is inspired by the **[Kardashev scale](https://en.wikipedia.org/wiki/Kardashev_scale)**, a method proposed by astrophysicist Nikolai Kardashev to measure a civilization's level of technological advancement based on its energy consumption. A Type I civilization harnesses all energy available on its planet, Type II captures the entire output of its star, and Type III commands the energy of an entire galaxy.
 
 In the age of AI-assisted development, **tokens are the new energy**. They power our reasoning, fuel our productivity, and drive our creative output. Just as the Kardashev scale tracks energy consumption at cosmic scales, Tokscale measures your token consumption as you scale the ranks of AI-augmented development. Whether you're a casual user or burning through millions of tokens daily, Tokscale helps you visualize your journey up the scale—from planetary developer to galactic code architect.
+
+## Contents
+
+- [Overview](#overview)
+  - [Why "Tokscale"?](#why-tokscale)
+- [Features](#features)
+- [Installation](#installation)
+  - [Quick Start](#quick-start)
+  - [Prerequisites](#prerequisites)
+  - [Development Setup](#development-setup)
+  - [Building the Native Module](#building-the-native-module)
+- [Usage](#usage)
+  - [Basic Commands](#basic-commands)
+  - [TUI Features](#tui-features)
+  - [Filtering by Platform](#filtering-by-platform)
+  - [Date Filtering](#date-filtering)
+  - [Pricing Lookup](#pricing-lookup)
+  - [Social](#social)
+  - [Automatic Sync](#automatic-sync)
+  - [Cursor IDE Commands](#cursor-ide-commands)
+  - [Example Output](#example-output---light-version)
+  - [Configuration](#configuration)
+  - [Environment Variables](#environment-variables)
+- [Frontend Visualization](#frontend-visualization)
+  - [Features](#features-1)
+  - [Running the Frontend](#running-the-frontend)
+- [Social Platform](#social-platform)
+  - [Features](#features-2)
+  - [Getting Started](#getting-started)
+  - [Data Validation](#data-validation)
+- [Wrapped 2025](#wrapped-2025)
+  - [Command](#command)
+  - [What's Included](#whats-included)
+- [Development](#development)
+  - [Prerequisites](#prerequisites-1)
+  - [How to Run](#how-to-run)
+- [Supported Platforms](#supported-platforms)
+  - [Native Module Targets](#native-module-targets)
+  - [Windows Support](#windows-support)
+- [Session Data Retention](#session-data-retention)
+- [Data Sources](#data-sources)
+- [Pricing](#pricing)
+- [Contributing](#contributing)
+  - [Development Guidelines](#development-guidelines)
+- [Acknowledgments](#acknowledgments)
+- [License](#license)
 
 ## Features
 
@@ -104,7 +115,7 @@ In the age of AI-assisted development, **tokens are the new energy**. They power
   - Real-time filtering and sorting
   - Zero flicker rendering (native Zig engine)
 - **Multi-platform support** - Track usage across OpenCode, Claude Code, Codex CLI, Cursor IDE, Gemini CLI, and Amp
-- **Real-time pricing** - Fetches current pricing from LiteLLM with 1-hour disk cache
+- **Real-time pricing** - Fetches current pricing from LiteLLM with 1-hour disk cache; automatic OpenRouter fallback for new models
 - **Detailed breakdowns** - Input, output, cache read/write, and reasoning token tracking
 - **Native Rust core** - All parsing and aggregation done in Rust for 10x faster processing
 - **Web visualization** - Interactive contribution graph with 2D and 3D views
@@ -160,16 +171,16 @@ bun run cli
 
 > **Note**: `bun run cli` is for local development. When installed via `bunx tokscale`, the command runs directly. The Usage section below shows the installed binary commands.
 
-### Building the Native Module (Optional)
+### Building the Native Module
 
-The native Rust module provides ~10x faster processing through parallel file scanning and SIMD JSON parsing:
+The native Rust module is **required** for CLI operation. It provides ~10x faster processing through parallel file scanning and SIMD JSON parsing:
 
 ```bash
 # Build the native core (run from repository root)
 bun run build:core
 ```
 
-Native modules are enabled on the `bunx tokscale` command by default. When the native module is not installed (e.g. on local development), the CLI automatically falls back to TypeScript implementations for full compatibility (with slower performance).
+> **Note**: Native binaries are pre-built and included when you install via `bunx tokscale@latest`. Building from source is only needed for local development.
 
 ## Usage
 
@@ -216,7 +227,7 @@ The interactive TUI mode provides:
   - `q`: Quit
 - **Mouse Support**: Click tabs, buttons, and filters
 - **Themes**: Green, Halloween, Teal, Blue, Pink, Purple, Orange, Monochrome, YlGnBu
-- **Settings Persistence**: Theme preference saved to `~/.config/tokscale/tui-settings.json`
+- **Settings Persistence**: Preferences saved to `~/.config/tokscale/settings.json` (see [Configuration](#configuration))
 
 ### Filtering by Platform
 
@@ -262,6 +273,46 @@ tokscale monthly --month --benchmark
 ```
 
 > **Note**: Date filters use your local timezone. Both `--since` and `--until` are inclusive.
+
+### Pricing Lookup
+
+Look up real-time pricing for any model:
+
+```bash
+# Look up model pricing
+tokscale pricing "claude-3-5-sonnet-20241022"
+tokscale pricing "gpt-4o"
+tokscale pricing "grok-code"
+
+# Force specific provider source
+tokscale pricing "grok-code" --provider openrouter
+tokscale pricing "claude-3-5-sonnet" --provider litellm
+```
+
+**Lookup Strategy:**
+
+The pricing lookup uses a multi-step resolution strategy:
+
+1. **Exact Match** - Direct lookup in LiteLLM/OpenRouter databases
+2. **Alias Resolution** - Resolves friendly names (e.g., `big-pickle` → `glm-4.7`)
+3. **Tier Suffix Stripping** - Removes quality tiers (`gpt-5.2-xhigh` → `gpt-5.2`)
+4. **Version Normalization** - Handles version formats (`claude-3-5-sonnet` ↔ `claude-3.5-sonnet`)
+5. **Provider Prefix Matching** - Tries common prefixes (`anthropic/`, `openai/`, etc.)
+6. **Fuzzy Matching** - Word-boundary matching for partial model names
+
+**Provider Preference:**
+
+When multiple matches exist, original model creators are preferred over resellers:
+
+| Preferred (Original) | Deprioritized (Reseller) |
+|---------------------|-------------------------|
+| `xai/` (Grok) | `azure_ai/` |
+| `anthropic/` (Claude) | `bedrock/` |
+| `openai/` (GPT) | `vertex_ai/` |
+| `google/` (Gemini) | `together_ai/` |
+| `meta-llama/` | `fireworks_ai/` |
+
+Example: `grok-code` matches `xai/grok-code-fast-1` ($0.20/$1.50) instead of `azure_ai/grok-code-fast-1` ($3.50/$17.50).
 
 ### Social
 
@@ -333,6 +384,24 @@ tokscale cursor logout
 
 <img alt="CLI Light" src="./.github/assets/cli-light.png" />
 
+### Configuration
+
+Tokscale stores settings in `~/.config/tokscale/settings.json`:
+
+```json
+{
+  "colorPalette": "blue",
+  "includeUnusedModels": false
+}
+```
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `colorPalette` | string | `"blue"` | TUI color theme (green, halloween, teal, blue, pink, purple, orange, monochrome, ylgnbu) |
+| `includeUnusedModels` | boolean | `false` | Show models with zero tokens in reports |
+| `autoRefreshEnabled` | boolean | `false` | Enable auto-refresh in TUI |
+| `autoRefreshMs` | number | `60000` | Auto-refresh interval (30000-3600000ms) |
+
 ### Environment Variables
 
 For advanced users with large datasets or specific requirements:
@@ -340,7 +409,7 @@ For advanced users with large datasets or specific requirements:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TOKSCALE_NATIVE_TIMEOUT_MS` | `300000` (5 min) | Maximum time for native subprocess processing |
-| `TOKSCALE_MAX_OUTPUT_BYTES` | `52428800` (50MB) | Maximum output size from native subprocess |
+| `TOKSCALE_MAX_OUTPUT_BYTES` | `104857600` (100MB) | Maximum output size from native subprocess |
 
 ```bash
 # Example: Increase timeout for very large datasets
@@ -554,92 +623,6 @@ tokscale graph --benchmark     # Benchmark graph generation
 tokscale graph --output packages/frontend/public/my-data.json
 ```
 
-### Architecture
-
-```
-tokscale/
-├── packages/
-│   ├── cli/src/            # TypeScript CLI
-│   │   ├── cli.ts          # Commander.js entry point
-│   │   ├── tui/            # OpenTUI interactive interface
-│   │   │   ├── App.tsx     # Main TUI app (Solid.js)
-│   │   │   ├── components/ # TUI components
-│   │   │   ├── hooks/      # Data fetching & state
-│   │   │   ├── config/     # Themes & settings
-│   │   │   └── utils/      # Formatting utilities
-│   │   ├── sessions/       # Platform session parsers
-│   │   │   ├── claudecode.ts  # Claude Code parser
-│   │   │   ├── codex.ts       # Codex CLI parser
-│   │   │   ├── gemini.ts      # Gemini CLI parser
-│   │   │   └── opencode.ts    # OpenCode parser
-│   │   ├── cursor.ts       # Cursor IDE integration
-│   │   ├── graph.ts        # Graph data generation
-│   │   ├── pricing.ts      # LiteLLM pricing fetcher
-│   │   └── native.ts       # Native module loader
-│   │
-│   ├── core/               # Rust native module (napi-rs)
-│   │   ├── src/
-│   │   │   ├── lib.rs      # NAPI exports
-│   │   │   ├── scanner.rs  # Parallel file discovery
-│   │   │   ├── parser.rs   # SIMD JSON parsing
-│   │   │   ├── aggregator.rs # Parallel aggregation
-│   │   │   ├── pricing.rs  # Cost calculation
-│   │   │   └── sessions/   # Platform-specific parsers
-│   │   ├── Cargo.toml
-│   │   └── package.json
-│   │
-│   ├── frontend/           # Next.js visualization & social platform
-│   │   └── src/
-│   │       ├── app/        # Next.js app router
-│   │       └── components/ # React components
-│   │
-│   └── benchmarks/         # Performance benchmarks
-│       ├── runner.ts       # Benchmark harness
-│       └── generate.ts     # Synthetic data generator
-```
-
-#### Hybrid TypeScript + Rust Architecture
-
-Tokscale uses a hybrid architecture for optimal performance:
-
-1. **TypeScript Layer**: CLI interface, pricing fetch (with disk cache), output formatting
-2. **Rust Native Core**: ALL parsing, cost calculation, and aggregation
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     TypeScript (CLI)                        │
-│  • Fetch pricing from LiteLLM (cached to disk, 1hr TTL)     │
-│  • Pass pricing data to Rust                                │
-│  • Display formatted results                                │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ pricing entries
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Rust Native Core                         │
-│  • Parallel file scanning (rayon)                           │
-│  • SIMD JSON parsing (simd-json)                            │
-│  • Cost calculation with pricing data                       │
-│  • Parallel aggregation by model/month/day                  │
-└─────────────────────────────────────────────────────────────┘
-```
-
-All heavy computation is done in Rust when the native module is available. When the native module is not installed, the CLI automatically falls back to TypeScript implementations for full compatibility (with slower performance).
-
-#### Key Technologies
-
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| CLI | [Commander.js](https://github.com/tj/commander.js) | Command-line parsing |
-| TUI | [OpenTUI](https://github.com/sst/opentui) + [Solid.js](https://www.solidjs.com/) | Interactive terminal UI (zero-flicker rendering) |
-| Runtime | [Bun](https://bun.sh/) | Fast JavaScript runtime (required) |
-| Tables | [cli-table3](https://github.com/cli-table/cli-table3) | Terminal table rendering (legacy CLI) |
-| Colors | [picocolors](https://github.com/alexeyraspopov/picocolors) | Terminal colors |
-| Native | [napi-rs](https://napi.rs/) | Node.js bindings for Rust |
-| Parallelism | [Rayon](https://github.com/rayon-rs/rayon) | Data parallelism in Rust |
-| JSON | [simd-json](https://github.com/simd-lite/simd-json) | SIMD-accelerated parsing |
-| Frontend | [Next.js 16](https://nextjs.org/) | React framework |
-| 3D Viz | [obelisk.js](https://github.com/nicklockwood/obelisk.js) | Isometric 3D rendering |
-
 ### Performance
 
 The native Rust module provides significant performance improvements:
@@ -679,14 +662,50 @@ cd packages/core && bun run bench
 
 | Platform | Architecture | Status |
 |----------|--------------|--------|
-| macOS | x86_64 | Supported |
-| macOS | aarch64 (Apple Silicon) | Supported |
-| Linux | x86_64 (glibc) | Supported |
-| Linux | aarch64 (glibc) | Supported |
-| Linux | x86_64 (musl) | Supported |
-| Linux | aarch64 (musl) | Supported |
-| Windows | x86_64 | Supported |
-| Windows | aarch64 | Supported |
+| macOS | x86_64 | ✅ Supported |
+| macOS | aarch64 (Apple Silicon) | ✅ Supported |
+| Linux | x86_64 (glibc) | ✅ Supported |
+| Linux | aarch64 (glibc) | ✅ Supported |
+| Linux | x86_64 (musl) | ✅ Supported |
+| Linux | aarch64 (musl) | ✅ Supported |
+| Windows | x86_64 | ✅ Supported |
+| Windows | aarch64 | ✅ Supported |
+
+### Windows Support
+
+Tokscale fully supports Windows. The TUI and CLI work the same as on macOS/Linux.
+
+**Installation on Windows:**
+```powershell
+# Install Bun (PowerShell)
+powershell -c "irm bun.sh/install.ps1 | iex"
+
+# Run tokscale
+bunx tokscale@latest
+```
+
+#### Data Locations on Windows
+
+AI coding tools store their session data in cross-platform locations. Most tools use the same relative paths on all platforms:
+
+| Tool | Unix Path | Windows Path | Source |
+|------|-----------|--------------|--------|
+| OpenCode | `~/.local/share/opencode/` | `%USERPROFILE%\.local\share\opencode\` | Uses [`xdg-basedir`](https://github.com/sindresorhus/xdg-basedir) for cross-platform consistency ([source](https://github.com/sst/opencode/blob/main/packages/opencode/src/global/index.ts)) |
+| Claude Code | `~/.claude/` | `%USERPROFILE%\.claude\` | Same path on all platforms |
+| Codex CLI | `~/.codex/` | `%USERPROFILE%\.codex\` | Configurable via `CODEX_HOME` env var ([source](https://github.com/openai/codex)) |
+| Gemini CLI | `~/.gemini/` | `%USERPROFILE%\.gemini\` | Same path on all platforms |
+| Amp | `~/.local/share/amp/` | `%USERPROFILE%\.local\share\amp\` | Uses `xdg-basedir` like OpenCode |
+| Cursor | API sync | API sync | Data fetched via API, cached in `%USERPROFILE%\.config\tokscale\cursor-cache\` |
+| Droid | `~/.factory/` | `%USERPROFILE%\.factory\` | Same path on all platforms |
+
+> **Note**: On Windows, `~` expands to `%USERPROFILE%` (e.g., `C:\Users\YourName`). These tools intentionally use Unix-style paths (like `.local/share`) even on Windows for cross-platform consistency, rather than Windows-native paths like `%APPDATA%`.
+
+#### Windows-Specific Configuration
+
+Tokscale stores its configuration in:
+- **Config**: `%USERPROFILE%\.config\tokscale\settings.json`
+- **Cache**: `%USERPROFILE%\.cache\tokscale\`
+- **Cursor credentials**: `%USERPROFILE%\.config\tokscale\cursor-credentials.json`
 
 ## Session Data Retention
 
@@ -822,7 +841,11 @@ Cursor data is fetched from the Cursor API using your session token and cached l
 
 Tokscale fetches real-time pricing from [LiteLLM's pricing database](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json).
 
-**Caching**: Pricing data is cached to disk at `~/.cache/tokscale/pricing.json` with a 1-hour TTL. This ensures fast startup while keeping pricing data fresh.
+**Dynamic Fallback**: For models not yet available in LiteLLM (e.g., recently released models), Tokscale automatically fetches pricing from [OpenRouter's endpoints API](https://openrouter.ai/docs/api/api-reference/endpoints/list-endpoints). This ensures you get accurate pricing from the model's author provider (e.g., Z.AI for glm-4.7) without waiting for LiteLLM updates.
+
+**Caching**: Pricing data is cached to disk with 1-hour TTL for fast startup:
+- LiteLLM cache: `~/.cache/tokscale/pricing-litellm.json`
+- OpenRouter cache: `~/.cache/tokscale/pricing-openrouter.json` (incremental, caches only models you've used)
 
 Pricing includes:
 - Input tokens

@@ -6,11 +6,9 @@ import * as os from "node:os";
 import pc from "picocolors";
 import {
   parseLocalSourcesAsync,
-  finalizeReportAsync,
-  finalizeGraphAsync,
+  finalizeReportAndGraphAsync,
   type ParsedMessages,
 } from "./native.js";
-import { PricingFetcher } from "./pricing.js";
 import { syncCursorCache, loadCursorCredentials } from "./cursor.js";
 import { loadCredentials } from "./credentials.js";
 import type { SourceType } from "./graph-types.js";
@@ -212,28 +210,25 @@ async function ensureFontsLoaded(): Promise<void> {
 
 async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
   const year = options.year || new Date().getFullYear().toString();
-  const sources = options.sources || ["opencode", "claude", "codex", "gemini", "cursor", "amp"];
-  const localSources = sources.filter(s => s !== "cursor") as ("opencode" | "claude" | "codex" | "gemini" | "amp")[];
+  const sources = options.sources || ["opencode", "claude", "codex", "gemini", "cursor", "amp", "droid"];
+  const localSources = sources.filter(s => s !== "cursor") as ("opencode" | "claude" | "codex" | "gemini" | "amp" | "droid")[];
   const includeCursor = sources.includes("cursor");
 
   const since = `${year}-01-01`;
   const until = `${year}-12-31`;
 
-  const pricingFetcher = new PricingFetcher();
-  
   const phase1Results = await Promise.allSettled([
-    pricingFetcher.fetchPricing(),
     includeCursor && loadCursorCredentials() ? syncCursorCache() : Promise.resolve({ synced: false, rows: 0 }),
     localSources.length > 0
-      ? parseLocalSourcesAsync({ sources: localSources, since, until, year, forceTypescript: options.includeAgents !== false })
-      : Promise.resolve({ messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, ampCount: 0, processingTimeMs: 0 } as ParsedMessages),
+      ? parseLocalSourcesAsync({ sources: localSources, since, until, year })
+      : Promise.resolve({ messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, ampCount: 0, droidCount: 0, processingTimeMs: 0 } as ParsedMessages),
   ]);
 
-  const cursorSync = phase1Results[1].status === "fulfilled" 
-    ? phase1Results[1].value 
+  const cursorSync = phase1Results[0].status === "fulfilled" 
+    ? phase1Results[0].value 
     : { synced: false, rows: 0 };
-  const localMessages = phase1Results[2].status === "fulfilled" 
-    ? phase1Results[2].value 
+  const localMessages = phase1Results[1].status === "fulfilled" 
+    ? phase1Results[1].value 
     : null;
 
   const emptyMessages: ParsedMessages = {
@@ -243,42 +238,23 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     codexCount: 0,
     geminiCount: 0,
     ampCount: 0,
+    droidCount: 0,
     processingTimeMs: 0,
   };
 
-  const [reportResult, graphResult] = await Promise.allSettled([
-    finalizeReportAsync({
-      localMessages: localMessages || emptyMessages,
-      pricing: pricingFetcher.toPricingEntries(),
-      includeCursor: includeCursor && cursorSync.synced,
-      since,
-      until,
-      year,
-    }),
-    finalizeGraphAsync({
-      localMessages: localMessages || emptyMessages,
-      pricing: pricingFetcher.toPricingEntries(),
-      includeCursor: includeCursor && cursorSync.synced,
-      since,
-      until,
-      year,
-    }),
-  ]);
-
-  if (reportResult.status === "rejected") {
-    throw new Error(`Failed to generate report: ${reportResult.reason}`);
-  }
-  if (graphResult.status === "rejected") {
-    throw new Error(`Failed to generate graph: ${graphResult.reason}`);
-  }
-
-  const report = reportResult.value;
-  const graph = graphResult.value;
+  const { report, graph } = await finalizeReportAndGraphAsync({
+    localMessages: localMessages || emptyMessages,
+    includeCursor: includeCursor && cursorSync.synced,
+    since,
+    until,
+    year,
+  });
 
   const modelMap = new Map<string, { cost: number; tokens: number }>();
   for (const entry of report.entries) {
-    const existing = modelMap.get(entry.model) || { cost: 0, tokens: 0 };
-    modelMap.set(entry.model, {
+    const displayName = formatModelName(entry.model);
+    const existing = modelMap.get(displayName) || { cost: 0, tokens: 0 };
+    modelMap.set(displayName, {
       cost: existing.cost + entry.cost,
       tokens: existing.tokens + entry.input + entry.output + entry.cacheRead + entry.cacheWrite,
     });
@@ -304,9 +280,6 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
 
   let topAgents: Array<{ name: string; cost: number; tokens: number; messages: number }> | undefined;
   if (options.includeAgents !== false && localMessages) {
-    const pricingEntries = pricingFetcher.toPricingEntries();
-    const pricingMap = new Map(pricingEntries.map(p => [p.modelId, p.pricing]));
-
     const agentMap = new Map<string, { cost: number; tokens: number; messages: number }>();
     for (const msg of localMessages.messages) {
       if (msg.source === "opencode" && msg.agent) {
@@ -314,17 +287,9 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
         const existing = agentMap.get(normalizedAgent) || { cost: 0, tokens: 0, messages: 0 };
 
         const msgTokens = msg.input + msg.output + msg.cacheRead + msg.cacheWrite + msg.reasoning;
-        const pricing = pricingMap.get(msg.modelId);
-        let msgCost = 0;
-        if (pricing) {
-          msgCost = (msg.input * pricing.inputCostPerToken) +
-                    (msg.output * pricing.outputCostPerToken) +
-                    (msg.cacheRead * (pricing.cacheReadInputTokenCost || 0)) +
-                    (msg.cacheWrite * (pricing.cacheCreationInputTokenCost || 0));
-        }
 
         agentMap.set(normalizedAgent, {
-          cost: existing.cost + msgCost,
+          cost: existing.cost,
           tokens: existing.tokens + msgTokens,
           messages: existing.messages + 1,
         });
@@ -717,7 +682,7 @@ async function generateWrappedImage(data: WrappedData, options: { short?: boolea
 
     ctx.fillStyle = COLORS.textPrimary;
     ctx.font = `${32 * SCALE}px Figtree, sans-serif`;
-    ctx.fillText(formatModelName(model.name), textX, yPos);
+    ctx.fillText(model.name, textX, yPos);
     yPos += 50 * SCALE;
   }
   yPos += 40 * SCALE;

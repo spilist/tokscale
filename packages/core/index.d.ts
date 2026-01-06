@@ -28,14 +28,13 @@ export interface DataSummary {
   models: Array<string>
 }
 
-/** Finalize graph with pricing */
-export declare function finalizeGraph(options: FinalizeGraphOptions): GraphResult
+/** Finalize graph */
+export declare function finalizeGraph(options: FinalizeGraphOptions): Promise<GraphResult>
 
 /** Options for finalizing graph */
 export interface FinalizeGraphOptions {
   homeDir?: string
   localMessages: ParsedMessages
-  pricing: Array<PricingEntry>
   includeCursor: boolean
   since?: string
   until?: string
@@ -46,49 +45,42 @@ export interface FinalizeGraphOptions {
 export interface FinalizeMonthlyOptions {
   homeDir?: string
   localMessages: ParsedMessages
-  pricing: Array<PricingEntry>
   includeCursor: boolean
   since?: string
   until?: string
   year?: string
 }
 
-/** Finalize monthly report with pricing */
-export declare function finalizeMonthlyReport(options: FinalizeMonthlyOptions): MonthlyReport
+/** Finalize monthly report */
+export declare function finalizeMonthlyReport(options: FinalizeMonthlyOptions): Promise<MonthlyReport>
 
 /** Finalize model report: apply pricing to local messages, add Cursor, aggregate */
-export declare function finalizeReport(options: FinalizeReportOptions): ModelReport
+export declare function finalizeReport(options: FinalizeReportOptions): Promise<ModelReport>
 
-/** Options for finalizing report with pricing */
+/**
+ * Finalize both report and graph in a single call with shared pricing
+ * This ensures consistent costs between report and graph data
+ */
+export declare function finalizeReportAndGraph(options: FinalizeReportOptions): Promise<ReportAndGraph>
+
+/** Options for finalizing report */
 export interface FinalizeReportOptions {
   homeDir?: string
   localMessages: ParsedMessages
-  pricing: Array<PricingEntry>
   includeCursor: boolean
   since?: string
   until?: string
   year?: string
 }
 
-/**
- * Generate graph data from all session sources
- *
- * This is the main entry point that orchestrates:
- * 1. Parallel file scanning
- * 2. Parallel session parsing
- * 3. Date filtering
- * 4. Parallel aggregation
- */
-export declare function generateGraph(options: GraphOptions): GraphResult
-
 /** Generate graph data with pricing calculation */
-export declare function generateGraphWithPricing(options: ReportOptions): GraphResult
+export declare function generateGraphWithPricing(options: ReportOptions): Promise<GraphResult>
 
 /** Get model usage report with pricing calculation */
-export declare function getModelReport(options: ReportOptions): ModelReport
+export declare function getModelReport(options: ReportOptions): Promise<ModelReport>
 
 /** Get monthly usage report with pricing calculation */
-export declare function getMonthlyReport(options: ReportOptions): MonthlyReport
+export declare function getMonthlyReport(options: ReportOptions): Promise<MonthlyReport>
 
 /** Metadata about the graph generation */
 export interface GraphMeta {
@@ -97,22 +89,6 @@ export interface GraphMeta {
   dateRangeStart: string
   dateRangeEnd: string
   processingTimeMs: number
-}
-
-/** Configuration options for graph generation */
-export interface GraphOptions {
-  /** Home directory path (defaults to user's home) */
-  homeDir?: string
-  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp" */
-  sources?: Array<string>
-  /** Start date filter (YYYY-MM-DD) */
-  since?: string
-  /** End date filter (YYYY-MM-DD) */
-  until?: string
-  /** Filter to specific year */
-  year?: string
-  /** Number of parallel threads (defaults to CPU count) */
-  threads?: number
 }
 
 /** Complete graph result */
@@ -135,13 +111,7 @@ export interface LocalParseOptions {
   year?: string
 }
 
-/** Pricing data for a single model (passed from TypeScript) */
-export interface ModelPricing {
-  inputCostPerToken: number
-  outputCostPerToken: number
-  cacheReadInputTokenCost?: number
-  cacheCreationInputTokenCost?: number
-}
+export declare function lookupPricing(modelId: string, provider?: string | undefined | null): Promise<PricingLookupResult>
 
 /** Model report result */
 export interface ModelReport {
@@ -188,6 +158,13 @@ export interface MonthlyUsage {
   cost: number
 }
 
+export interface NativePricing {
+  inputCostPerToken: number
+  outputCostPerToken: number
+  cacheReadInputTokenCost?: number
+  cacheCreationInputTokenCost?: number
+}
+
 export interface ParsedMessage {
   source: string
   modelId: string
@@ -211,6 +188,7 @@ export interface ParsedMessages {
   codexCount: number
   geminiCount: number
   ampCount: number
+  droidCount: number
   processingTimeMs: number
 }
 
@@ -220,40 +198,26 @@ export interface ParsedMessages {
  */
 export declare function parseLocalSources(options: LocalParseOptions): ParsedMessages
 
-/** Entry in the pricing map */
-export interface PricingEntry {
+export interface PricingLookupResult {
   modelId: string
-  pricing: ModelPricing
+  matchedKey: string
+  source: string
+  pricing: NativePricing
 }
 
-/** Options for reports with pricing */
+/** Combined result for report and graph (single pricing lookup) */
+export interface ReportAndGraph {
+  report: ModelReport
+  graph: GraphResult
+}
+
+/** Options for reports */
 export interface ReportOptions {
-  /** Home directory path (defaults to user's home) */
   homeDir?: string
-  /** Sources to include: "opencode", "claude", "codex", "gemini", "cursor", "amp" */
   sources?: Array<string>
-  /** Pricing data for cost calculation */
-  pricing: Array<PricingEntry>
-  /** Start date filter (YYYY-MM-DD) */
   since?: string
-  /** End date filter (YYYY-MM-DD) */
   until?: string
-  /** Filter to specific year */
   year?: string
-}
-
-/** Scan for session files (for debugging/testing) */
-export declare function scanSessions(homeDir?: string | undefined | null, sources?: Array<string> | undefined | null): ScanStats
-
-/** Scan session files and return file counts per source */
-export interface ScanStats {
-  opencodeFiles: number
-  claudeFiles: number
-  codexFiles: number
-  geminiFiles: number
-  cursorFiles: number
-  ampFiles: number
-  totalFiles: number
 }
 
 /** Source contribution for a specific day */

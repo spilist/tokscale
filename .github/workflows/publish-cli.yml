@@ -1,13 +1,10 @@
 name: Publish
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "packages/core/package.json"
-      - "packages/cli/package.json"
-      - "packages/tokscale/package.json"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 env:
   DEBUG: napi:*
@@ -15,61 +12,64 @@ env:
   MACOSX_DEPLOYMENT_TARGET: "10.13"
 
 jobs:
-  check-versions:
-    name: Check version changes
+  bump-versions:
+    name: Bump versions
     runs-on: ubuntu-latest
     outputs:
-      should-publish: ${{ steps.check.outputs.should-publish }}
-      version: ${{ steps.check.outputs.version }}
+      version: ${{ steps.bump.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      - name: Check version sync and changes
-        id: check
-        env:
-          IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Bump patch version
+        id: bump
         run: |
-          CORE_VERSION=$(jq -r '.version' packages/core/package.json)
-          CLI_VERSION=$(jq -r '.version' packages/cli/package.json)
-          ALIAS_VERSION=$(jq -r '.version' packages/tokscale/package.json)
+          # Read current version
+          CURRENT_VERSION=$(jq -r '.version' packages/core/package.json)
+          echo "📦 Current version: $CURRENT_VERSION"
           
-          echo "📦 Package versions:"
-          echo "  @tokscale/core:  $CORE_VERSION"
-          echo "  @tokscale/cli:   $CLI_VERSION"
-          echo "  tokscale:        $ALIAS_VERSION"
+          # Calculate new version (increment patch)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "🚀 New version: $NEW_VERSION"
           
-          # All versions must be in sync
-          if [ "$CORE_VERSION" != "$CLI_VERSION" ] || [ "$CLI_VERSION" != "$ALIAS_VERSION" ]; then
-            echo "❌ ERROR: Package versions are not in sync!"
-            echo "   All packages must have the same version."
-            exit 1
-          fi
+          # Update packages/core/package.json
+          jq --arg v "$NEW_VERSION" '.version = $v' packages/core/package.json > tmp.json && mv tmp.json packages/core/package.json
+          echo "✅ Updated packages/core/package.json"
           
-          echo "version=$CORE_VERSION" >> $GITHUB_OUTPUT
+          # Update packages/cli/package.json (version + @tokscale/core dependency)
+          jq --arg v "$NEW_VERSION" '.version = $v | .dependencies["@tokscale/core"] = $v' packages/cli/package.json > tmp.json && mv tmp.json packages/cli/package.json
+          echo "✅ Updated packages/cli/package.json"
           
-          if [ "$IS_MANUAL" = "true" ]; then
-            echo "🚀 Manual trigger - publishing all packages"
-            echo "should-publish=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          # Update packages/tokscale/package.json (version + @tokscale/cli dependency)
+          jq --arg v "$NEW_VERSION" '.version = $v | .dependencies["@tokscale/cli"] = $v' packages/tokscale/package.json > tmp.json && mv tmp.json packages/tokscale/package.json
+          echo "✅ Updated packages/tokscale/package.json"
           
-          # Check if version changed from previous commit
-          PREV_VERSION=$(git show HEAD~1:packages/core/package.json 2>/dev/null | jq -r '.version' 2>/dev/null || echo "")
+          # Verify all versions are updated
+          echo ""
+          echo "📋 Verification:"
+          echo "  @tokscale/core:  $(jq -r '.version' packages/core/package.json)"
+          echo "  @tokscale/cli:   $(jq -r '.version' packages/cli/package.json)"
+          echo "  tokscale:        $(jq -r '.version' packages/tokscale/package.json)"
+          echo "  cli -> core dep: $(jq -r '.dependencies["@tokscale/core"]' packages/cli/package.json)"
+          echo "  tokscale -> cli: $(jq -r '.dependencies["@tokscale/cli"]' packages/tokscale/package.json)"
           
-          if [ "$CORE_VERSION" != "$PREV_VERSION" ]; then
-            echo "✅ Version changed: $PREV_VERSION → $CORE_VERSION"
-            echo "should-publish=true" >> $GITHUB_OUTPUT
-          else
-            echo "⏭️ No version change ($CORE_VERSION)"
-            echo "should-publish=false" >> $GITHUB_OUTPUT
-          fi
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "📝 Version bump prepared (will commit after successful publish)"
+
+      - name: Upload bumped package.json files
+        uses: actions/upload-artifact@v4
+        with:
+          name: bumped-packages
+          path: |
+            packages/core/package.json
+            packages/cli/package.json
+            packages/tokscale/package.json
+          retention-days: 1
 
   build:
     name: Build - ${{ matrix.settings.target }}
-    needs: check-versions
-    if: needs.check-versions.outputs.should-publish == 'true'
+    needs: bump-versions
     runs-on: ${{ matrix.settings.host }}
     strategy:
       fail-fast: false
@@ -121,6 +121,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download bumped package.json files
+        uses: actions/download-artifact@v4
+        with:
+          name: bumped-packages
+          path: packages/
+
+      - name: Restore package.json structure
+        shell: bash
+        run: |
+          mv packages/core/package.json packages/core/package.json 2>/dev/null || true
+          mv packages/cli/package.json packages/cli/package.json 2>/dev/null || true
+          mv packages/tokscale/package.json packages/tokscale/package.json 2>/dev/null || true
+          echo "📦 Using version: $(jq -r '.version' packages/core/package.json)"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -171,14 +185,30 @@ jobs:
           path: packages/core/*.node
           if-no-files-found: error
 
+      # Upload generated JS files from first build only (ubuntu x86_64-gnu)
+      - name: Upload generated NAPI files
+        if: matrix.settings.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: napi-generated
+          path: |
+            packages/core/index.js
+            packages/core/index.d.ts
+          if-no-files-found: error
+
   publish-core:
     name: Publish @tokscale/core
-    needs: [check-versions, build]
-    if: needs.check-versions.outputs.should-publish == 'true'
+    needs: [bump-versions, build]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download bumped package.json files
+        uses: actions/download-artifact@v4
+        with:
+          name: bumped-packages
+          path: packages/
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -192,6 +222,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: packages/core/artifacts
+          pattern: bindings-*
 
       - name: Move artifacts
         working-directory: packages/core
@@ -201,20 +232,33 @@ jobs:
           done
           ls -la *.node
 
+      - name: Download generated NAPI files
+        uses: actions/download-artifact@v4
+        with:
+          name: napi-generated
+          path: packages/core/
+
       - name: Publish @tokscale/core
         working-directory: packages/core
-        run: bun publish --access public
+        run: |
+          echo "📦 Publishing version: $(jq -r '.version' package.json)"
+          bun publish --access public
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-cli:
     name: Publish @tokscale/cli
-    needs: [check-versions, publish-core]
-    if: needs.check-versions.outputs.should-publish == 'true'
+    needs: [bump-versions, publish-core]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download bumped package.json files
+        uses: actions/download-artifact@v4
+        with:
+          name: bumped-packages
+          path: packages/
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -231,18 +275,25 @@ jobs:
 
       - name: Publish @tokscale/cli
         working-directory: packages/cli
-        run: bun publish --access public
+        run: |
+          echo "📦 Publishing version: $(jq -r '.version' package.json)"
+          bun publish --access public
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-alias:
     name: Publish tokscale (wrapper)
-    needs: [check-versions, publish-cli]
-    if: needs.check-versions.outputs.should-publish == 'true'
+    needs: [bump-versions, publish-cli]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download bumped package.json files
+        uses: actions/download-artifact@v4
+        with:
+          name: bumped-packages
+          path: packages/
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -251,6 +302,47 @@ jobs:
 
       - name: Publish tokscale
         working-directory: packages/tokscale
-        run: bun publish --access public
+        run: |
+          echo "📦 Publishing version: $(jq -r '.version' package.json)"
+          bun publish --access public
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  finalize:
+    name: Commit version bump
+    needs: [bump-versions, publish-alias]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Download bumped package.json files
+        uses: actions/download-artifact@v4
+        with:
+          name: bumped-packages
+          path: packages/
+
+      - name: Download generated NAPI files
+        uses: actions/download-artifact@v4
+        with:
+          name: napi-generated
+          path: packages/core/
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push version bump
+        run: |
+          NEW_VERSION="${{ needs.bump-versions.outputs.version }}"
+          echo "📦 Committing version bump to $NEW_VERSION"
+          
+          git add packages/core/package.json packages/core/index.js packages/core/index.d.ts packages/cli/package.json packages/tokscale/package.json
+          git commit -m "chore: bump version to $NEW_VERSION"
+          git push
+          
+          echo "✅ Successfully published and committed version $NEW_VERSION"

@@ -1,6 +1,6 @@
 {
   "name": "@tokscale/core",
-  "version": "1.0.17",
+  "version": "1.0.22",
   "description": "Native Rust core for tokscale CLI - high-performance session parsing",
   "main": "index.js",
   "types": "index.d.ts",
@@ -28,7 +28,7 @@
   },
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --release",
+    "build": "napi build --platform --release",
     "build:platform": "napi build --platform --release",
     "build:debug": "napi build",
     "prepublishOnly": "napi prepublish -t npm",

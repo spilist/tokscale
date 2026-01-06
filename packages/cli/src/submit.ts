@@ -5,11 +5,8 @@
 
 import pc from "picocolors";
 import { loadCredentials, getApiBaseUrl } from "./credentials.js";
-import { PricingFetcher } from "./pricing.js";
-import {
-  isNativeAvailable,
-  generateGraphWithPricingAsync,
-} from "./native.js";
+import { parseLocalSourcesAsync, finalizeReportAndGraphAsync, type ParsedMessages } from "./native.js";
+import { syncCursorCache, loadCursorCredentials } from "./cursor.js";
 import type { TokenContributionData } from "./graph-types.js";
 import { formatCurrency } from "./table.js";
 
@@ -20,6 +17,7 @@ interface SubmitOptions {
   gemini?: boolean;
   cursor?: boolean;
   amp?: boolean;
+  droid?: boolean;
   since?: string;
   until?: string;
   year?: string;
@@ -46,7 +44,7 @@ interface SubmitResponse {
   details?: string[];
 }
 
-type SourceType = "opencode" | "claude" | "codex" | "gemini" | "cursor" | "amp";
+type SourceType = "opencode" | "claude" | "codex" | "gemini" | "cursor" | "amp" | "droid";
 
 /**
  * Submit command - sends usage data to the platform
@@ -70,24 +68,13 @@ export async function submit(options: SubmitOptions = {}): Promise<void> {
     process.exit(1);
   }
 
-  // Step 2: Log native module status (TS fallback available)
-  if (!isNativeAvailable()) {
-    logIfNotQuiet(pc.yellow("\n  Note: Using TypeScript fallback (native module not available)"));
-    logIfNotQuiet(pc.gray("  Run 'bun run build:core' for faster processing.\n"));
-  }
-
   logIfNotQuiet(pc.cyan("\n  Tokscale - Submit Usage Data\n"));
 
-  // Step 3: Generate graph data
   logIfNotQuiet(pc.gray("  Scanning local session data..."));
 
-  const fetcher = new PricingFetcher();
-  await fetcher.fetchPricing();
-  const pricingEntries = fetcher.toPricingEntries();
-
-  // Determine sources
-  const hasFilter = options.opencode || options.claude || options.codex || options.gemini || options.cursor || options.amp;
+  const hasFilter = options.opencode || options.claude || options.codex || options.gemini || options.cursor || options.amp || options.droid;
   let sources: SourceType[] | undefined;
+  let includeCursor = true;
   if (hasFilter) {
     sources = [];
     if (options.opencode) sources.push("opencode");
@@ -96,17 +83,42 @@ export async function submit(options: SubmitOptions = {}): Promise<void> {
     if (options.gemini) sources.push("gemini");
     if (options.cursor) sources.push("cursor");
     if (options.amp) sources.push("amp");
+    if (options.droid) sources.push("droid");
+    includeCursor = sources.includes("cursor");
   }
+
+  // Filter out cursor from local sources (it's handled separately via sync)
+  const localSources = sources?.filter((s): s is Exclude<SourceType, "cursor"> => s !== "cursor");
 
   let data: TokenContributionData;
   try {
-    data = await generateGraphWithPricingAsync({
-      sources,
-      pricing: pricingEntries,
+    // Two-phase processing (same as TUI) for consistency:
+    // Phase 1: Parse local sources + sync cursor in parallel
+    const [localMessages, cursorSync] = await Promise.all([
+      parseLocalSourcesAsync({
+        sources: localSources,
+        since: options.since,
+        until: options.until,
+        year: options.year,
+      }),
+      includeCursor && loadCursorCredentials()
+        ? syncCursorCache()
+        : Promise.resolve({ synced: false, rows: 0 }),
+    ]);
+
+    // Phase 2: Finalize with pricing (combines local + cursor)
+    // Single subprocess call ensures consistent pricing for both report and graph
+    const { report, graph } = await finalizeReportAndGraphAsync({
+      localMessages,
+      includeCursor: includeCursor && cursorSync.synced,
       since: options.since,
       until: options.until,
       year: options.year,
     });
+
+    // Use graph structure for submission, report's cost for display
+    data = graph;
+    data.summary.totalCost = report.totalCost;
   } catch (error) {
     console.error(pc.red(`\n  Error generating data: ${(error as Error).message}\n`));
     process.exit(1);

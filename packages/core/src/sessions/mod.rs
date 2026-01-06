@@ -6,6 +6,7 @@ pub mod amp;
 pub mod claudecode;
 pub mod codex;
 pub mod cursor;
+pub mod droid;
 pub mod gemini;
 pub mod opencode;
 
@@ -22,6 +23,7 @@ pub struct UnifiedMessage {
     pub tokens: TokenBreakdown,
     pub cost: f64,
     pub agent: Option<String>,
+    pub dedup_key: Option<String>,
 }
 
 pub fn normalize_agent_name(agent: &str) -> String {
@@ -51,7 +53,7 @@ impl UnifiedMessage {
         tokens: TokenBreakdown,
         cost: f64,
     ) -> Self {
-        Self::new_with_agent(source, model_id, provider_id, session_id, timestamp, tokens, cost, None)
+        Self::new_full(source, model_id, provider_id, session_id, timestamp, tokens, cost, None, None)
     }
 
     pub fn new_with_agent(
@@ -64,6 +66,33 @@ impl UnifiedMessage {
         cost: f64,
         agent: Option<String>,
     ) -> Self {
+        Self::new_full(source, model_id, provider_id, session_id, timestamp, tokens, cost, agent, None)
+    }
+
+    pub fn new_with_dedup(
+        source: impl Into<String>,
+        model_id: impl Into<String>,
+        provider_id: impl Into<String>,
+        session_id: impl Into<String>,
+        timestamp: i64,
+        tokens: TokenBreakdown,
+        cost: f64,
+        dedup_key: Option<String>,
+    ) -> Self {
+        Self::new_full(source, model_id, provider_id, session_id, timestamp, tokens, cost, None, dedup_key)
+    }
+
+    fn new_full(
+        source: impl Into<String>,
+        model_id: impl Into<String>,
+        provider_id: impl Into<String>,
+        session_id: impl Into<String>,
+        timestamp: i64,
+        tokens: TokenBreakdown,
+        cost: f64,
+        agent: Option<String>,
+        dedup_key: Option<String>,
+    ) -> Self {
         let date = timestamp_to_date(timestamp);
         Self {
             source: source.into(),
@@ -75,6 +104,7 @@ impl UnifiedMessage {
             tokens,
             cost,
             agent,
+            dedup_key,
         }
     }
 }

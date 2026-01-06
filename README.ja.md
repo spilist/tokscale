@@ -18,7 +18,7 @@
 [![GitHub Issues](https://img.shields.io/github/issues/junhoyeo/tokscale?color=0073FF&labelColor=black&style=flat-square)](https://github.com/junhoyeo/tokscale/issues)
 [![License](https://img.shields.io/badge/license-MIT-white?labelColor=black&style=flat-square)](https://github.com/junhoyeo/tokscale/blob/master/LICENSE)
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
+[🇺🇸 English](README.md) | [🇰🇷 한국어](README.ko.md) | [🇯🇵 日本語](README.ja.md) | [🇨🇳 简体中文](README.zh-cn.md)
 
 </div>
 
@@ -49,14 +49,60 @@
 | <img width="48px" src=".github/assets/client-openai.jpg" alt="Codex" /> | [Codex CLI](https://github.com/openai/codex) | `~/.codex/sessions/` | ✅ 対応 |
 | <img width="48px" src=".github/assets/client-gemini.png" alt="Gemini" /> | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `~/.gemini/tmp/*/chats/` | ✅ 対応 |
 | <img width="48px" src=".github/assets/client-cursor.jpg" alt="Cursor" /> | [Cursor IDE](https://cursor.com/) | `~/.config/tokscale/cursor-cache/`経由でAPI同期 | ✅ 対応 |
+| <img width="48px" src=".github/assets/client-amp.png" alt="Amp" /> | [Amp (AmpCode)](https://ampcode.com/) | `~/.local/share/amp/threads/` | ✅ 対応 |
+| <img width="48px" src=".github/assets/client-droid.png" alt="Droid" /> | [Droid (Factory Droid)](https://factory.ai/) | `~/.factory/sessions/` | ✅ 対応 |
 
 [🚅 LiteLLMの価格データ](https://github.com/BerriAI/litellm)を使用してリアルタイム価格計算を提供し、階層型価格モデルとキャッシュトークン割引をサポートしています。
 
 ### なぜ「Tokscale」？
 
-このプロジェクトは**[カルダシェフ・スケール(Kardashev Scale)](https://ja.wikipedia.org/wiki/%E3%82%AB%E3%83%AB%E3%83%80%E3%82%B7%E3%82%A7%E3%83%95%E3%83%BB%E3%82%B9%E3%82%B1%E3%83%BC%E3%83%AB)**に触発されています。これは天体物理学者ニコライ・カルダシェフがエネルギー消費量に基づいて文明の技術的発展レベルを測定するために提案した方法です。タイプI文明は惑星上で利用可能なすべてのエネルギーを活用し、タイプIIは恒星の全出力を捕捉し、タイプIIIは銀河全体のエネルギーを支配します。
+このプロジェクトは **[カルダシェフ・スケール(Kardashev Scale)](https://ja.wikipedia.org/wiki/%E3%82%AB%E3%83%AB%E3%83%80%E3%82%B7%E3%82%A7%E3%83%95%E3%83%BB%E3%82%B9%E3%82%B1%E3%83%BC%E3%83%AB)** に触発されています。これは天体物理学者ニコライ・カルダシェフがエネルギー消費量に基づいて文明の技術的発展レベルを測定するために提案した方法です。タイプI文明は惑星上で利用可能なすべてのエネルギーを活用し、タイプIIは恒星の全出力を捕捉し、タイプIIIは銀河全体のエネルギーを支配します。
 
 AI支援開発の時代において、**トークンは新しいエネルギー**です。トークンは私たちの思考力を動かし、生産性を高め、創造的な成果を駆動します。カルダシェフ・スケールが宇宙規模でエネルギー消費を追跡するように、Tokscaleは AI増強開発のランクを上げながらトークン消費を測定します。カジュアルユーザーでも毎日数百万のトークンを消費する人でも、Tokscaleは惑星級開発者から銀河級コードアーキテクトへの旅を視覚化するのに役立ちます。
+
+## 目次
+
+- [概要](#概要)
+  - [なぜ「Tokscale」？](#なぜtokscale)
+- [機能](#機能)
+- [インストール](#インストール)
+  - [クイックスタート](#クイックスタート)
+  - [前提条件](#前提条件)
+  - [開発環境セットアップ](#開発環境セットアップ)
+  - [ネイティブモジュールのビルド](#ネイティブモジュールのビルド)
+- [使用方法](#使用方法)
+  - [基本コマンド](#基本コマンド)
+  - [TUI機能](#tui機能)
+  - [プラットフォーム別フィルタリング](#プラットフォーム別フィルタリング)
+  - [日付フィルタリング](#日付フィルタリング)
+  - [価格検索](#価格検索)
+  - [ソーシャルプラットフォームコマンド](#ソーシャルプラットフォームコマンド)
+  - [Cursor IDEコマンド](#cursor-ideコマンド)
+  - [出力例](#出力例--lightバージョン)
+  - [環境変数](#環境変数)
+- [フロントエンド可視化](#フロントエンド可視化)
+  - [機能](#機能-1)
+  - [フロントエンドの実行](#フロントエンドの実行)
+- [ソーシャルプラットフォーム](#ソーシャルプラットフォーム)
+  - [機能](#機能-2)
+  - [はじめに](#はじめに)
+  - [データ検証](#データ検証)
+- [Wrapped 2025](#wrapped-2025)
+  - [コマンド](#コマンド)
+  - [含まれる内容](#含まれる内容)
+- [開発](#開発)
+  - [前提条件](#前提条件-1)
+  - [実行方法](#実行方法)
+- [サポートプラットフォーム](#サポートプラットフォーム)
+  - [ネイティブモジュールターゲット](#ネイティブモジュールターゲット)
+  - [Windowsサポート](#windowsサポート)
+- [セッションデータ保持](#セッションデータ保持)
+- [データソース](#データソース)
+- [価格](#価格)
+- [コントリビューション](#コントリビューション)
+  - [開発ガイドライン](#開発ガイドライン)
+- [謝辞](#謝辞)
+- [ライセンス](#ライセンス)
 
 ## 機能
 
@@ -120,16 +166,16 @@ bun run cli
 
 > **注**: `bun run cli`はローカル開発用です。`bunx tokscale`でインストールすると、コマンドが直接実行されます。以下の使用法セクションはインストールされたバイナリコマンドを示しています。
 
-### ネイティブモジュールのビルド（オプション）
+### ネイティブモジュールのビルド
 
-ネイティブRustモジュールは並列ファイルスキャンとSIMD JSON解析により約10倍高速な処理を提供します：
+ネイティブRustモジュールはCLI操作に**必須**です。並列ファイルスキャンとSIMD JSON解析により約10倍高速な処理を提供します：
 
 ```bash
 # ネイティブコアをビルド（リポジトリルートから実行）
 bun run build:core
 ```
 
-ネイティブモジュールは`bunx tokscale`コマンドでデフォルトで有効になっています。ネイティブモジュールがインストールされていない場合（例：ローカル開発時）、CLIは完全な互換性のために自動的にTypeScript実装にフォールバックします（パフォーマンスは低下）。
+> **注**: `bunx tokscale@latest`でインストールすると、ネイティブバイナリはビルド済みで含まれています。ソースからのビルドはローカル開発にのみ必要です。
 
 ## 使用方法
 
@@ -223,6 +269,46 @@ tokscale monthly --month --benchmark
 
 > **注**: 日付フィルターはローカルタイムゾーンを使用します。`--since`と`--until`は両方とも包括的です。
 
+### 価格検索
+
+任意のモデルのリアルタイム価格を検索します：
+
+```bash
+# モデル価格を検索
+tokscale pricing "claude-3-5-sonnet-20241022"
+tokscale pricing "gpt-4o"
+tokscale pricing "grok-code"
+
+# 特定のプロバイダーソースを強制
+tokscale pricing "grok-code" --provider openrouter
+tokscale pricing "claude-3-5-sonnet" --provider litellm
+```
+
+**検索戦略：**
+
+価格検索は多段階の解決戦略を使用します：
+
+1. **完全一致** - LiteLLM/OpenRouterデータベースでの直接検索
+2. **エイリアス解決** - 親しみやすい名前を解決（例：`big-pickle` → `glm-4.7`）
+3. **ティアサフィックス除去** - 品質ティアを削除（`gpt-5.2-xhigh` → `gpt-5.2`）
+4. **バージョン正規化** - バージョン形式を処理（`claude-3-5-sonnet` ↔ `claude-3.5-sonnet`）
+5. **プロバイダープレフィックスマッチング** - 一般的なプレフィックスを試行（`anthropic/`、`openai/`など）
+6. **ファジーマッチング** - 部分モデル名の単語境界マッチング
+
+**プロバイダー優先順位：**
+
+複数のマッチがある場合、オリジナルモデル作成者がリセラーより優先されます：
+
+| 優先（オリジナル） | 非優先（リセラー） |
+|---------------------|-------------------------|
+| `xai/`（Grok） | `azure_ai/` |
+| `anthropic/`（Claude） | `bedrock/` |
+| `openai/`（GPT） | `vertex_ai/` |
+| `google/`（Gemini） | `together_ai/` |
+| `meta-llama/` | `fireworks_ai/` |
+
+例：`grok-code`は`azure_ai/grok-code-fast-1`（$3.50/$17.50）ではなく`xai/grok-code-fast-1`（$0.20/$1.50）にマッチします。
+
 ### ソーシャルプラットフォームコマンド
 
 ```bash
@@ -283,7 +369,7 @@ tokscale cursor logout
 | 変数 | デフォルト | 説明 |
 |----------|---------|-------------|
 | `TOKSCALE_NATIVE_TIMEOUT_MS` | `300000`（5分） | ネイティブサブプロセス処理の最大時間 |
-| `TOKSCALE_MAX_OUTPUT_BYTES` | `52428800`（50MB） | ネイティブサブプロセスからの最大出力サイズ |
+| `TOKSCALE_MAX_OUTPUT_BYTES` | `104857600`（100MB） | ネイティブサブプロセスからの最大出力サイズ |
 
 ```bash
 # 例：非常に大きなデータセット用にタイムアウトを増加
@@ -495,92 +581,6 @@ tokscale graph --benchmark     # グラフ生成をベンチマーク
 tokscale graph --output packages/frontend/public/my-data.json
 ```
 
-### アーキテクチャ
-
-```
-tokscale/
-├── packages/
-│   ├── cli/src/            # TypeScript CLI
-│   │   ├── cli.ts          # Commander.jsエントリーポイント
-│   │   ├── tui/            # OpenTUIインタラクティブインターフェース
-│   │   │   ├── App.tsx     # メインTUIアプリ（Solid.js）
-│   │   │   ├── components/ # TUIコンポーネント
-│   │   │   ├── hooks/      # データフェッチ＆状態
-│   │   │   ├── config/     # テーマ＆設定
-│   │   │   └── utils/      # フォーマットユーティリティ
-│   │   ├── sessions/       # プラットフォームセッションパーサー
-│   │   │   ├── claudecode.ts  # Claude Codeパーサー
-│   │   │   ├── codex.ts       # Codex CLIパーサー
-│   │   │   ├── gemini.ts      # Gemini CLIパーサー
-│   │   │   └── opencode.ts    # OpenCodeパーサー
-│   │   ├── cursor.ts       # Cursor IDE統合
-│   │   ├── graph.ts        # グラフデータ生成
-│   │   ├── pricing.ts      # LiteLLM価格フェッチャー
-│   │   └── native.ts       # ネイティブモジュールローダー
-│   │
-│   ├── core/               # Rustネイティブモジュール（napi-rs）
-│   │   ├── src/
-│   │   │   ├── lib.rs      # NAPIエクスポート
-│   │   │   ├── scanner.rs  # 並列ファイル探索
-│   │   │   ├── parser.rs   # SIMD JSON解析
-│   │   │   ├── aggregator.rs # 並列集計
-│   │   │   ├── pricing.rs  # コスト計算
-│   │   │   └── sessions/   # プラットフォーム固有パーサー
-│   │   ├── Cargo.toml
-│   │   └── package.json
-│   │
-│   ├── frontend/           # Next.js可視化＆ソーシャルプラットフォーム
-│   │   └── src/
-│   │       ├── app/        # Next.jsアプリルーター
-│   │       └── components/ # Reactコンポーネント
-│   │
-│   └── benchmarks/         # パフォーマンスベンチマーク
-│       ├── runner.ts       # ベンチマークハーネス
-│       └── generate.ts     # 合成データジェネレーター
-```
-
-#### ハイブリッドTypeScript + Rustアーキテクチャ
-
-Tokscaleは最適なパフォーマンスのためにハイブリッドアーキテクチャを使用しています：
-
-1. **TypeScriptレイヤー**: CLIインターフェース、価格フェッチ（ディスクキャッシュ付き）、出力フォーマット
-2. **Rustネイティブコア**: すべての解析、コスト計算、集計
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     TypeScript (CLI)                        │
-│  • LiteLLMから価格を取得（ディスクキャッシュ、1時間TTL）        │
-│  • 価格データをRustに渡す                                     │
-│  • フォーマットされた結果を表示                                │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ pricing entries
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Rustネイティブコア                         │
-│  • 並列ファイルスキャン（rayon）                              │
-│  • SIMD JSON解析（simd-json）                               │
-│  • 価格データを使用したコスト計算                              │
-│  • モデル/月/日別の並列集計                                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-ネイティブモジュールが利用可能な場合、すべての重い計算はRustで行われます。ネイティブモジュールがインストールされていない場合、CLIは完全な互換性のためにTypeScript実装に自動的にフォールバックします（パフォーマンスは低下）。
-
-#### 主要技術
-
-| レイヤー | 技術 | 用途 |
-|-------|------------|---------|
-| CLI | [Commander.js](https://github.com/tj/commander.js) | コマンドライン解析 |
-| TUI | [OpenTUI](https://github.com/sst/opentui) + [Solid.js](https://www.solidjs.com/) | インタラクティブターミナルUI（ゼロフリッカーレンダリング） |
-| ランタイム | [Bun](https://bun.sh/) | 高速JavaScriptランタイム（必須） |
-| テーブル | [cli-table3](https://github.com/cli-table/cli-table3) | ターミナルテーブルレンダリング（レガシーCLI） |
-| 色 | [picocolors](https://github.com/alexeyraspopov/picocolors) | ターミナルカラー |
-| ネイティブ | [napi-rs](https://napi.rs/) | Rust用Node.jsバインディング |
-| 並列性 | [Rayon](https://github.com/rayon-rs/rayon) | Rustデータ並列処理 |
-| JSON | [simd-json](https://github.com/simd-lite/simd-json) | SIMD高速化解析 |
-| フロントエンド | [Next.js 16](https://nextjs.org/) | Reactフレームワーク |
-| 3D可視化 | [obelisk.js](https://github.com/nicklockwood/obelisk.js) | アイソメトリック3Dレンダリング |
-
 ### パフォーマンス
 
 ネイティブRustモジュールは大幅なパフォーマンス向上を提供します：
@@ -620,14 +620,50 @@ cd packages/core && bun run bench
 
 | プラットフォーム | アーキテクチャ | ステータス |
 |----------|--------------|--------|
-| macOS | x86_64 | サポート |
-| macOS | aarch64（Apple Silicon） | サポート |
-| Linux | x86_64（glibc） | サポート |
-| Linux | aarch64（glibc） | サポート |
-| Linux | x86_64（musl） | サポート |
-| Linux | aarch64（musl） | サポート |
-| Windows | x86_64 | サポート |
-| Windows | aarch64 | サポート |
+| macOS | x86_64 | ✅ サポート |
+| macOS | aarch64（Apple Silicon） | ✅ サポート |
+| Linux | x86_64（glibc） | ✅ サポート |
+| Linux | aarch64（glibc） | ✅ サポート |
+| Linux | x86_64（musl） | ✅ サポート |
+| Linux | aarch64（musl） | ✅ サポート |
+| Windows | x86_64 | ✅ サポート |
+| Windows | aarch64 | ✅ サポート |
+
+### Windowsサポート
+
+TokscaleはWindowsを完全にサポートしています。TUIとCLIはmacOS/Linuxと同様に動作します。
+
+**Windowsでのインストール：**
+```powershell
+# Bunのインストール（PowerShell）
+powershell -c "irm bun.sh/install.ps1 | iex"
+
+# tokscaleの実行
+bunx tokscale@latest
+```
+
+#### Windowsでのデータ保存場所
+
+AIコーディングツールはクロスプラットフォームの場所にセッションデータを保存します。ほとんどのツールはすべてのプラットフォームで同じ相対パスを使用します：
+
+| ツール | Unixパス | Windowsパス | ソース |
+|------|-----------|--------------|--------|
+| OpenCode | `~/.local/share/opencode/` | `%USERPROFILE%\.local\share\opencode\` | クロスプラットフォームの一貫性のため[`xdg-basedir`](https://github.com/sindresorhus/xdg-basedir)を使用（[ソース](https://github.com/sst/opencode/blob/main/packages/opencode/src/global/index.ts)） |
+| Claude Code | `~/.claude/` | `%USERPROFILE%\.claude\` | すべてのプラットフォームで同じパス |
+| Codex CLI | `~/.codex/` | `%USERPROFILE%\.codex\` | `CODEX_HOME`環境変数で設定可能（[ソース](https://github.com/openai/codex)） |
+| Gemini CLI | `~/.gemini/` | `%USERPROFILE%\.gemini\` | すべてのプラットフォームで同じパス |
+| Amp | `~/.local/share/amp/` | `%USERPROFILE%\.local\share\amp\` | OpenCodeと同様に`xdg-basedir`を使用 |
+| Cursor | API同期 | API同期 | APIでデータを取得、`%USERPROFILE%\.config\tokscale\cursor-cache\`にキャッシュ |
+| Droid | `~/.factory/` | `%USERPROFILE%\.factory\` | すべてのプラットフォームで同じパス |
+
+> **注**: Windowsでは`~`は`%USERPROFILE%`に展開されます（例：`C:\Users\ユーザー名`）。これらのツールは`%APPDATA%`のようなWindowsネイティブパスではなく、クロスプラットフォームの一貫性のためにUnixスタイルのパス（`.local/share`など）を意図的に使用しています。
+
+#### Windows固有の設定
+
+Tokscaleは以下の場所に設定を保存します：
+- **設定**: `%USERPROFILE%\.config\tokscale\settings.json`
+- **キャッシュ**: `%USERPROFILE%\.cache\tokscale\`
+- **Cursor認証情報**: `%USERPROFILE%\.config\tokscale\cursor-credentials.json`
 
 ## セッションデータ保持
 
@@ -763,7 +799,9 @@ CursorデータはセッショントークンでCursor APIから取得され、�
 
 Tokscaleは[LiteLLMの価格データベース](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)からリアルタイム価格を取得します。
 
-**キャッシュ**: 価格データは1時間TTLで`~/.cache/tokscale/pricing.json`にディスクキャッシュされます。これにより、価格データを最新に保ちながら高速な起動を確保します。
+**キャッシュ**: 価格データは1時間TTLでディスクにキャッシュされ、高速な起動を確保します：
+- LiteLLMキャッシュ: `~/.cache/tokscale/pricing-litellm.json`
+- OpenRouterキャッシュ: `~/.cache/tokscale/pricing-openrouter.json`（増分式、使用したモデルのみキャッシュ）
 
 価格には以下が含まれます：
 - 入力トークン

@@ -117,28 +117,30 @@ async function handleStarPrompt(username: string): Promise<void> {
     return;
   }
 
-  try {
-    const hasStarred = await checkGitHubStarStatus();
-    if (hasStarred) {
-      saveStarCache({
-        username,
-        hasStarred: true,
-        checkedAt: new Date().toISOString(),
-      });
-      return;
+  const ghExists = await checkGhCliExists();
+
+  if (ghExists) {
+    try {
+      const hasStarred = await checkGitHubStarStatus();
+      if (hasStarred) {
+        saveStarCache({
+          username,
+          hasStarred: true,
+          checkedAt: new Date().toISOString(),
+        });
+        return;
+      }
+    } catch (error: any) {
+      if (
+        error.code === 'ENOTFOUND' || 
+        error.code === 'ETIMEDOUT' || 
+        error.stderr?.includes('404') || 
+        error.stderr?.includes('Could not resolve')
+      ) {
+        return;
+      }
+      throw error;
     }
-  } catch (error: any) {
-    // Only suppress network/API errors, let auth failures through
-    if (
-      error.code === 'ENOTFOUND' || 
-      error.code === 'ETIMEDOUT' || 
-      error.stderr?.includes('404') || 
-      error.stderr?.includes('Could not resolve')
-    ) {
-      return;
-    }
-    // Auth failures and other errors should propagate
-    throw error;
   }
 
   console.log();
@@ -152,13 +154,11 @@ async function handleStarPrompt(username: string): Promise<void> {
     return;
   }
 
-  const ghExists = await checkGhCliExists();
   if (!ghExists) {
     console.log();
     console.log(pc.yellow("  GitHub CLI (gh) not found."));
     console.log(pc.white("  Please star the repo manually:"));
     console.log(pc.cyan("  https://github.com/junhoyeo/tokscale\n"));
-    // Don't exit - continue to submission
     return;
   }
 

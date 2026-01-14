@@ -752,6 +752,15 @@ mod tests {
             },
         );
         m.insert(
+            "gpt-4o-mini".into(),
+            ModelPricing {
+                input_cost_per_token: Some(0.00000015),
+                output_cost_per_token: Some(0.0000006),
+                cache_read_input_token_cost: Some(0.000000075),
+                cache_creation_input_token_cost: None,
+            },
+        );
+        m.insert(
             "gpt-4-turbo".into(),
             ModelPricing {
                 input_cost_per_token: Some(0.00001),
@@ -1421,45 +1430,6 @@ mod tests {
     }
 
     #[test]
-    fn test_strip_tier_suffix_fn() {
-        assert_eq!(strip_tier_suffix("gpt-4o-low"), Some("gpt-4o"));
-        assert_eq!(strip_tier_suffix("model-high"), Some("model"));
-        assert_eq!(strip_tier_suffix("model-medium"), Some("model"));
-        assert_eq!(strip_tier_suffix("model-free"), Some("model"));
-        assert_eq!(strip_tier_suffix("model:low"), Some("model"));
-        assert_eq!(strip_tier_suffix("model:high"), Some("model"));
-        assert_eq!(strip_tier_suffix("gpt-5.2-xhigh"), Some("gpt-5.2"));
-        assert_eq!(
-            strip_tier_suffix("gpt-5.1-codex-max-xhigh"),
-            Some("gpt-5.1-codex-max")
-        );
-        assert_eq!(strip_tier_suffix("gpt-4o"), None);
-        assert_eq!(strip_tier_suffix("claude-3-5-sonnet"), None);
-    }
-
-    #[test]
-    fn test_strip_fallback_suffix_fn() {
-        // Basic -codex suffix stripping
-        assert_eq!(strip_fallback_suffix("gpt-5-codex"), Some("gpt-5"));
-        assert_eq!(strip_fallback_suffix("gpt-5.1-codex"), Some("gpt-5.1"));
-        assert_eq!(
-            strip_fallback_suffix("some-model-codex"),
-            Some("some-model")
-        );
-
-        // -codex-max should be stripped before -codex (longer suffix first)
-        assert_eq!(strip_fallback_suffix("gpt-5.1-codex-max"), Some("gpt-5.1"));
-
-        // No fallback suffix present
-        assert_eq!(strip_fallback_suffix("gpt-5"), None);
-        assert_eq!(strip_fallback_suffix("claude-3-5-sonnet"), None);
-        assert_eq!(strip_fallback_suffix("gpt-4o"), None);
-
-        // Suffix in middle doesn't match (must be at end)
-        assert_eq!(strip_fallback_suffix("codex-model"), None);
-    }
-
-    #[test]
     fn test_fallback_suffix_lookup() {
         // Create a lookup with only the base model (no -codex variant)
         let mut litellm = HashMap::new();
@@ -1733,24 +1703,8 @@ mod tests {
     }
 
     // =========================================================================
-    // ROUTING PREFIX TESTS (e.g., antigravity-auth plugin)
+    // INTELLIGENT PREFIX/SUFFIX STRIPPING TESTS
     // =========================================================================
-
-    #[test]
-    fn test_strip_routing_prefix_fn() {
-        assert_eq!(
-            strip_routing_prefix("antigravity-gemini-3-flash"),
-            "gemini-3-flash"
-        );
-        assert_eq!(
-            strip_routing_prefix("antigravity-claude-sonnet-4-5"),
-            "claude-sonnet-4-5"
-        );
-        assert_eq!(strip_routing_prefix("Antigravity-gpt-4o"), "gpt-4o");
-        assert_eq!(strip_routing_prefix("ANTIGRAVITY-gpt-4o"), "gpt-4o");
-        assert_eq!(strip_routing_prefix("gemini-3-flash"), "gemini-3-flash");
-        assert_eq!(strip_routing_prefix("gpt-4o"), "gpt-4o");
-    }
 
     #[test]
     fn test_antigravity_prefix_gemini_3_flash() {
@@ -1806,5 +1760,85 @@ mod tests {
         let cost_without_prefix = lookup.calculate_cost("gpt-5.2", 1_000_000, 500_000, 0, 0, 0);
         assert!((cost_with_prefix - cost_without_prefix).abs() < 0.001);
         assert!(cost_with_prefix > 0.0);
+    }
+
+    // New tests for intelligent detection
+
+    #[test]
+    fn test_unknown_prefix_generic() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("myplugin-gpt-4o").unwrap();
+        assert_eq!(result.matched_key, "gpt-4o");
+    }
+
+    #[test]
+    fn test_unknown_prefix_two_segments() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("router-v2-claude-sonnet-4-5").unwrap();
+        assert_eq!(result.matched_key, "claude-sonnet-4-5");
+    }
+
+    #[test]
+    fn test_unknown_suffix_thinking() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("claude-sonnet-4-5-thinking").unwrap();
+        assert_eq!(result.matched_key, "claude-sonnet-4-5");
+    }
+
+    #[test]
+    fn test_unknown_suffix_two_segments() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("claude-opus-4-5-thinking-pro").unwrap();
+        assert_eq!(result.matched_key, "claude-opus-4-5");
+    }
+
+    #[test]
+    fn test_prefix_and_suffix_combined() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("antigravity-claude-opus-4-5-thinking").unwrap();
+        assert_eq!(result.matched_key, "claude-opus-4-5");
+    }
+
+    #[test]
+    fn test_prefix_and_suffix_with_tier() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("antigravity-claude-opus-4-5-thinking-high").unwrap();
+        assert_eq!(result.matched_key, "claude-opus-4-5");
+    }
+
+    #[test]
+    fn test_no_false_positive_valid_model() {
+        let lookup = create_lookup();
+        // gpt-4o-mini is a valid model, should NOT strip "gpt"
+        let result = lookup.lookup("gpt-4o-mini").unwrap();
+        assert_eq!(result.matched_key, "gpt-4o-mini");
+    }
+
+    #[test]
+    fn test_suffix_strip_high() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("claude-sonnet-4-5-high").unwrap();
+        assert_eq!(result.matched_key, "claude-sonnet-4-5");
+    }
+
+    #[test]
+    fn test_suffix_strip_xhigh() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("claude-sonnet-4-5-xhigh").unwrap();
+        assert_eq!(result.matched_key, "claude-sonnet-4-5");
+    }
+
+    #[test]
+    fn test_suffix_strip_low() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("gpt-4o-low").unwrap();
+        assert_eq!(result.matched_key, "gpt-4o");
+    }
+
+    #[test]
+    fn test_suffix_strip_codex() {
+        let lookup = create_lookup();
+        let result = lookup.lookup("gpt-5.2-codex").unwrap();
+        assert_eq!(result.matched_key, "gpt-5.2");
     }
 }

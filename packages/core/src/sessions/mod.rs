@@ -9,6 +9,7 @@ pub mod cursor;
 pub mod droid;
 pub mod gemini;
 pub mod opencode;
+pub(crate) mod utils;
 
 use crate::TokenBreakdown;
 

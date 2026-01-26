@@ -226,8 +226,9 @@ export async function submit(options: SubmitOptions = {}): Promise<void> {
         : Promise.resolve({ synced: false, rows: 0, error: undefined }),
     ]);
 
-    if (includeCursor && cursorSync.synced && cursorSync.error) {
-      console.log(pc.yellow(`  Cursor sync warning: ${cursorSync.error}`));
+    if (includeCursor && cursorSync.error && (cursorSync.synced || hasCursorUsageCache())) {
+      const prefix = cursorSync.synced ? "Cursor sync warning" : "Cursor sync failed; using cached data";
+      console.log(pc.yellow(`  ${prefix}: ${cursorSync.error}`));
     }
 
     // Phase 2: Finalize with pricing (combines local + cursor)

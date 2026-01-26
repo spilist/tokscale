@@ -231,8 +231,9 @@ async function loadWrappedData(options: WrappedOptions): Promise<WrappedData> {
     ? phase1Results[1].value 
     : null;
 
-  if (includeCursor && cursorSync.synced && cursorSync.error) {
-    console.log(pc.yellow(`  Cursor sync warning: ${cursorSync.error}`));
+  if (includeCursor && cursorSync.error && (cursorSync.synced || hasCursorUsageCache())) {
+    const prefix = cursorSync.synced ? "Cursor sync warning" : "Cursor sync failed; using cached data";
+    console.log(pc.yellow(`  ${prefix}: ${cursorSync.error}`));
   }
 
   const emptyMessages: ParsedMessages = {

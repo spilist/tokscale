@@ -169,9 +169,10 @@ async function loadData(
     ? phase1Results[1].value 
     : null;
 
-  if (includeCursor && cursorSync.synced && cursorSync.error) {
+  if (includeCursor && cursorSync.error && (cursorSync.synced || hasCursorUsageCache())) {
     // TUI should keep working; just emit a warning.
-    console.warn(`Cursor sync warning: ${cursorSync.error}`);
+    const prefix = cursorSync.synced ? "Cursor sync warning" : "Cursor sync failed; using cached data";
+    console.warn(`${prefix}: ${cursorSync.error}`);
   }
 
   const emptyMessages: ParsedMessages = {

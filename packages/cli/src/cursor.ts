@@ -347,19 +347,7 @@ export function setActiveCursorAccount(nameOrId: string): { ok: boolean; error?:
       }
     }
 
-    // Ensure we never keep both usage.csv and usage.<active>.csv
-    const dupActive = getCursorCacheFilePathForAccount(resolved, false);
-    if (fs.existsSync(CURSOR_CACHE_FILE) && fs.existsSync(dupActive)) {
-      try {
-        archiveFile(dupActive, `usage.dup.${resolved}`);
-      } catch {
-        try {
-          fs.rmSync(dupActive);
-        } catch {
-          // ignore
-        }
-      }
-    }
+    // If a per-account cache exists, it was promoted into usage.csv above.
   } catch {
     // ignore cache reconcile errors
   }
@@ -504,12 +492,7 @@ export function removeCursorAccount(
         }
         fs.renameSync(nextFile, CURSOR_CACHE_FILE);
       }
-      const dupActive = getCursorCacheFilePathForAccount(nextId, false);
-      if (fs.existsSync(CURSOR_CACHE_FILE) && fs.existsSync(dupActive)) {
-        try {
-          fs.rmSync(dupActive);
-        } catch {}
-      }
+      // If nextFile existed, it was promoted into usage.csv above.
     } catch {
       // ignore
     }

@@ -36,6 +36,9 @@ fn account_id_from_cursor_cache_path(path: &Path) -> String {
                 }
             })
             .collect::<String>();
+        if cleaned.is_empty() {
+            return "unknown".to_string();
+        }
         return cleaned;
     }
 

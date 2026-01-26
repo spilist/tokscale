@@ -338,16 +338,36 @@ Cursor IDE는 세션 토큰을 통한 별도의 인증이 필요합니다 (소�
 
 ```bash
 # Cursor 로그인 (브라우저에서 세션 토큰 필요)
-tokscale cursor login
+# --name은 선택이며, 나중에 계정을 구분하기 위한 라벨입니다
+tokscale cursor login --name work
 
 # Cursor 인증 상태 및 세션 유효성 확인
 tokscale cursor status
 
-# Cursor 로그아웃 (저장된 자격 증명 제거)
-tokscale cursor logout
+# 저장된 Cursor 계정 목록
+tokscale cursor accounts
+
+# 활성 계정 전환 (cursor-cache/usage.csv에 동기화되는 계정)
+tokscale cursor switch work
+
+# 특정 계정 로그아웃 (기록은 보관, 합산에서는 제외)
+tokscale cursor logout --name work
+
+# 로그아웃 + 해당 계정 캐시 삭제
+tokscale cursor logout --name work --purge-cache
+
+# 모든 Cursor 계정 로그아웃 (기록은 보관, 합산에서는 제외)
+tokscale cursor logout --all
+
+# 모든 계정 로그아웃 + 캐시 삭제
+tokscale cursor logout --all --purge-cache
 ```
 
-**자격 증명 저장**: Cursor 세션 토큰은 `~/.config/tokscale/cursor-credentials.json`에 저장됩니다. 사용량 데이터는 `~/.config/tokscale/cursor-cache/`에 캐시됩니다.
+**자격 증명 저장**: Cursor 계정들은 `~/.config/tokscale/cursor-credentials.json`에 저장됩니다. 사용량 데이터는 `~/.config/tokscale/cursor-cache/`에 캐시됩니다 (활성 계정은 `usage.csv`, 추가 계정은 `usage.<account>.csv`).
+
+기본적으로 tokscale은 **저장된 모든 Cursor 계정의 사용량을 합산**합니다 (`cursor-cache/usage*.csv` 전체). 호환성을 위해 활성 계정은 `cursor-cache/usage.csv`에 동기화됩니다.
+
+로그아웃 시에는 캐시된 사용량 기록을 `cursor-cache/archive/`로 옮겨 보관하며(그래서 합산에서는 제외됨), 완전 삭제를 원하면 `--purge-cache`를 사용하세요.
 
 **Cursor 세션 토큰 얻는 방법:**
 1. 브라우저에서 https://www.cursor.com/settings 열기

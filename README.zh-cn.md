@@ -339,16 +339,36 @@ Cursor IDE 需要通过会话令牌进行单独认证（与社交平台登录不
 
 ```bash
 # 登录 Cursor（需要从浏览器获取会话令牌）
-tokscale cursor login
+# --name 是可选的，用于之后区分账户的标签
+tokscale cursor login --name work
 
 # 检查 Cursor 认证状态和会话有效性
 tokscale cursor status
 
-# 从 Cursor 登出（删除保存的凭据）
-tokscale cursor logout
+# 列出已保存的 Cursor 账户
+tokscale cursor accounts
+
+# 切换活动账户（同步到 cursor-cache/usage.csv 的账户）
+tokscale cursor switch work
+
+# 登出指定账户（保留历史，但不再参与合并统计）
+tokscale cursor logout --name work
+
+# 登出并删除该账户的缓存
+tokscale cursor logout --name work --purge-cache
+
+# 登出所有 Cursor 账户（保留历史，但不再参与合并统计）
+tokscale cursor logout --all
+
+# 登出所有账户并删除缓存
+tokscale cursor logout --all --purge-cache
 ```
 
-**凭据存储**：Cursor 会话令牌保存到 `~/.config/tokscale/cursor-credentials.json`。使用量数据缓存在 `~/.config/tokscale/cursor-cache/`。
+**凭据存储**：Cursor 账户保存到 `~/.config/tokscale/cursor-credentials.json`。使用量数据缓存在 `~/.config/tokscale/cursor-cache/`（活动账户使用 `usage.csv`，其他账户使用 `usage.<account>.csv`）。
+
+默认情况下，tokscale 会 **合并统计所有已保存 Cursor 账户的使用量**（`cursor-cache/usage*.csv`）。为保持兼容性，活动账户会同步到 `cursor-cache/usage.csv`。
+
+登出时，tokscale 会将缓存的历史记录移动到 `cursor-cache/archive/`（因此不会参与合并统计）。如需彻底删除缓存，请使用 `--purge-cache`。
 
 **获取 Cursor 会话令牌的方法：**
 1. 在浏览器中打开 https://www.cursor.com/settings

@@ -12,6 +12,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { createHash } from "node:crypto";
 import { parse as parseCsv } from "csv-parse/sync";
 
 // ============================================================================
@@ -23,6 +24,13 @@ export interface CursorCredentials {
   userId?: string;
   createdAt: string;
   expiresAt?: string;
+  label?: string;
+}
+
+interface CursorCredentialsStoreV1 {
+  version: 1;
+  activeAccountId: string;
+  accounts: Record<string, CursorCredentials>;
 }
 
 export interface CursorUsageRow {
@@ -106,34 +114,412 @@ function migrateCursorFromOldPath(): void {
   }
 }
 
-export function saveCursorCredentials(credentials: CursorCredentials): void {
-  ensureConfigDir();
-  fs.writeFileSync(CURSOR_CREDENTIALS_FILE, JSON.stringify(credentials, null, 2), {
-    encoding: "utf-8",
-    mode: 0o600,
-  });
+export function ensureCursorMigration(): void {
+  // Best-effort: never throw
+  try {
+    migrateCursorFromOldPath();
+  } catch {}
+  try {
+    migrateCursorCacheFromOldPath();
+  } catch {}
+  try {
+    // Triggers legacy schema -> v1 store migration if needed
+    loadCursorCredentialsStoreInternal();
+  } catch {}
 }
 
-export function loadCursorCredentials(): CursorCredentials | null {
+function isStoreV1(data: unknown): data is CursorCredentialsStoreV1 {
+  if (!data || typeof data !== "object") return false;
+  const obj = data as Record<string, unknown>;
+  return obj.version === 1 && typeof obj.activeAccountId === "string" && typeof obj.accounts === "object" && obj.accounts !== null;
+}
+
+function extractUserIdFromSessionToken(sessionToken: string): string | null {
+  if (!sessionToken) return null;
+  const token = sessionToken.trim();
+  if (token.includes("%3A%3A")) {
+    const userId = token.split("%3A%3A")[0]?.trim();
+    return userId ? userId : null;
+  }
+  if (token.includes("::")) {
+    const userId = token.split("::")[0]?.trim();
+    return userId ? userId : null;
+  }
+  return null;
+}
+
+function sanitizeAccountIdForFilename(accountId: string): string {
+  return accountId
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "account";
+}
+
+function isCursorUsageCsvFilename(fileName: string): boolean {
+  if (fileName === "usage.csv") return true;
+  if (!fileName.startsWith("usage.")) return false;
+  if (!fileName.endsWith(".csv")) return false;
+  // Exclude legacy backups (were previously written as usage.backup-<ts>.csv)
+  if (fileName.startsWith("usage.backup")) return false;
+
+  const stem = fileName.slice("usage.".length, -".csv".length);
+  if (!stem) return false;
+  return /^[a-z0-9._-]+$/i.test(stem);
+}
+
+function deriveAccountId(sessionToken: string): string {
+  const userId = extractUserIdFromSessionToken(sessionToken);
+  if (userId) return userId;
+  const hash = createHash("sha256").update(sessionToken).digest("hex").slice(0, 12);
+  return `anon-${hash}`;
+}
+
+function atomicWriteFile(filePath: string, data: string, mode: number): void {
+  const dir = path.dirname(filePath);
+  const base = path.basename(filePath);
+  const tmp = path.join(dir, `.${base}.tmp-${process.pid}`);
+  fs.writeFileSync(tmp, data, { encoding: "utf-8", mode });
+  try {
+    fs.renameSync(tmp, filePath);
+  } catch {
+    // Best-effort for platforms where rename over an existing file can fail.
+    try {
+      if (fs.existsSync(filePath)) fs.rmSync(filePath);
+    } catch {
+      // ignore
+    }
+    fs.renameSync(tmp, filePath);
+  }
+}
+
+function loadCursorCredentialsStoreInternal(): CursorCredentialsStoreV1 | null {
   migrateCursorFromOldPath();
   try {
-    if (!fs.existsSync(CURSOR_CREDENTIALS_FILE)) {
-      return null;
-    }
+    if (!fs.existsSync(CURSOR_CREDENTIALS_FILE)) return null;
     const data = fs.readFileSync(CURSOR_CREDENTIALS_FILE, "utf-8");
-    const parsed = JSON.parse(data);
+    const parsed: unknown = JSON.parse(data);
 
-    if (!parsed.sessionToken) {
-      return null;
+    if (isStoreV1(parsed)) {
+      const store = parsed;
+      if (!store.activeAccountId || !store.accounts[store.activeAccountId]) {
+        const firstId = Object.keys(store.accounts)[0];
+        if (!firstId) return null;
+        store.activeAccountId = firstId;
+        ensureConfigDir();
+        atomicWriteFile(CURSOR_CREDENTIALS_FILE, JSON.stringify(store, null, 2), 0o600);
+      }
+      return store;
     }
 
-    return parsed as CursorCredentials;
+    // Legacy single-account schema: { sessionToken, createdAt, ... }
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as Record<string, unknown>;
+      const sessionToken = typeof obj.sessionToken === "string" ? obj.sessionToken : "";
+      if (!sessionToken) return null;
+
+      const accountId = deriveAccountId(sessionToken);
+      const migrated: CursorCredentialsStoreV1 = {
+        version: 1,
+        activeAccountId: accountId,
+        accounts: {
+          [accountId]: {
+            sessionToken,
+            userId: typeof obj.userId === "string" ? obj.userId : extractUserIdFromSessionToken(sessionToken) || undefined,
+            createdAt: typeof obj.createdAt === "string" ? obj.createdAt : new Date().toISOString(),
+            expiresAt: typeof obj.expiresAt === "string" ? obj.expiresAt : undefined,
+            label: typeof obj.label === "string" ? obj.label : undefined,
+          },
+        },
+      };
+
+      ensureConfigDir();
+      atomicWriteFile(CURSOR_CREDENTIALS_FILE, JSON.stringify(migrated, null, 2), 0o600);
+      return migrated;
+    }
+
+    return null;
   } catch {
     return null;
   }
 }
 
+function saveCursorCredentialsStoreInternal(store: CursorCredentialsStoreV1): void {
+  ensureConfigDir();
+  atomicWriteFile(CURSOR_CREDENTIALS_FILE, JSON.stringify(store, null, 2), 0o600);
+}
+
+function resolveAccountId(store: CursorCredentialsStoreV1, nameOrId: string): string | null {
+  const needle = nameOrId.trim();
+  if (!needle) return null;
+  if (store.accounts[needle]) return needle;
+
+  const needleLower = needle.toLowerCase();
+  for (const [id, acct] of Object.entries(store.accounts)) {
+    if (acct.label && acct.label.toLowerCase() === needleLower) return id;
+  }
+  return null;
+}
+
+export function listCursorAccounts(): Array<{ id: string; label?: string; userId?: string; createdAt: string; isActive: boolean }> {
+  const store = loadCursorCredentialsStoreInternal();
+  if (!store) return [];
+
+  const accounts = Object.entries(store.accounts).map(([id, acct]) => ({
+    id,
+    label: acct.label,
+    userId: acct.userId,
+    createdAt: acct.createdAt,
+    isActive: id === store.activeAccountId,
+  }));
+
+  accounts.sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    const la = (a.label || a.id).toLowerCase();
+    const lb = (b.label || b.id).toLowerCase();
+    return la.localeCompare(lb);
+  });
+
+  return accounts;
+}
+
+export function setActiveCursorAccount(nameOrId: string): { ok: boolean; error?: string } {
+  const store = loadCursorCredentialsStoreInternal();
+  if (!store) return { ok: false, error: "Not authenticated" };
+  const resolved = resolveAccountId(store, nameOrId);
+  if (!resolved) return { ok: false, error: `Account not found: ${nameOrId}` };
+  const prev = store.activeAccountId;
+  store.activeAccountId = resolved;
+  saveCursorCredentialsStoreInternal(store);
+
+  // Best-effort cache reconcile (avoid double-counting)
+  try {
+    migrateCursorCacheFromOldPath();
+    ensureCacheDir();
+
+    const archiveDir = path.join(CURSOR_CACHE_DIR, "archive");
+    const ensureArchiveDir = (): void => {
+      ensureCacheDir();
+      if (!fs.existsSync(archiveDir)) {
+        fs.mkdirSync(archiveDir, { recursive: true, mode: 0o700 });
+      }
+    };
+    const archiveFile = (filePath: string, label: string): void => {
+      ensureArchiveDir();
+      const safeLabel = sanitizeAccountIdForFilename(label);
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      const dest = path.join(archiveDir, `${safeLabel}-${ts}.csv`);
+      fs.renameSync(filePath, dest);
+    };
+
+    // Move current active cache to previous account file (preserve any existing file by archiving).
+    if (prev && fs.existsSync(CURSOR_CACHE_FILE)) {
+      const prevFile = getCursorCacheFilePathForAccount(prev, false);
+      if (fs.existsSync(prevFile)) {
+        try {
+          archiveFile(prevFile, `usage.${prev}.previous`);
+        } catch {
+          // ignore
+        }
+      }
+      try {
+        fs.renameSync(CURSOR_CACHE_FILE, prevFile);
+      } catch {
+        // ignore
+      }
+    }
+
+    // Promote next account cache file into usage.csv.
+    const nextFile = getCursorCacheFilePathForAccount(resolved, false);
+    if (fs.existsSync(nextFile)) {
+      if (fs.existsSync(CURSOR_CACHE_FILE)) {
+        try {
+          archiveFile(CURSOR_CACHE_FILE, `usage.active.pre-switch`);
+        } catch {
+          // ignore
+        }
+      }
+      try {
+        fs.renameSync(nextFile, CURSOR_CACHE_FILE);
+      } catch {
+        // ignore
+      }
+    }
+
+    // Ensure we never keep both usage.csv and usage.<active>.csv
+    const dupActive = getCursorCacheFilePathForAccount(resolved, false);
+    if (fs.existsSync(CURSOR_CACHE_FILE) && fs.existsSync(dupActive)) {
+      try {
+        archiveFile(dupActive, `usage.dup.${resolved}`);
+      } catch {
+        try {
+          fs.rmSync(dupActive);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  } catch {
+    // ignore cache reconcile errors
+  }
+
+  return { ok: true };
+}
+
+export function saveCursorCredentials(credentials: CursorCredentials, options?: { label?: string; setActive?: boolean }): { accountId: string } {
+  const sessionToken = credentials.sessionToken;
+  const accountId = deriveAccountId(sessionToken);
+  const store = loadCursorCredentialsStoreInternal() || {
+    version: 1 as const,
+    activeAccountId: accountId,
+    accounts: {},
+  };
+
+  if (options?.label) {
+    const needle = options.label.trim().toLowerCase();
+    if (needle) {
+      for (const [id, acct] of Object.entries(store.accounts)) {
+        if (id === accountId) continue;
+        if (acct.label && acct.label.trim().toLowerCase() === needle) {
+          throw new Error(`Cursor account label already exists: ${options.label}`);
+        }
+      }
+    }
+  }
+
+  const next: CursorCredentials = {
+    ...credentials,
+    userId: credentials.userId || extractUserIdFromSessionToken(sessionToken) || undefined,
+    label: options?.label ?? credentials.label,
+  };
+
+  store.accounts[accountId] = next;
+  if (options?.setActive !== false) {
+    store.activeAccountId = accountId;
+  }
+  saveCursorCredentialsStoreInternal(store);
+  return { accountId };
+}
+
+export function loadCursorCredentials(nameOrId?: string): CursorCredentials | null {
+  const store = loadCursorCredentialsStoreInternal();
+  if (!store) return null;
+
+  if (nameOrId) {
+    const resolved = resolveAccountId(store, nameOrId);
+    return resolved ? store.accounts[resolved] : null;
+  }
+
+  return store.accounts[store.activeAccountId] || null;
+}
+
+export function loadCursorCredentialsStore(): CursorCredentialsStoreV1 | null {
+  return loadCursorCredentialsStoreInternal();
+}
+
+// NOTE: implementation moved below to support cache archiving by default.
+
+export function removeCursorAccount(
+  nameOrId: string,
+  options?: { purgeCache?: boolean }
+): { removed: boolean; error?: string } {
+  const store = loadCursorCredentialsStoreInternal();
+  if (!store) return { removed: false, error: "Not authenticated" };
+
+  const resolved = resolveAccountId(store, nameOrId);
+  if (!resolved) return { removed: false, error: `Account not found: ${nameOrId}` };
+
+  const wasActive = resolved === store.activeAccountId;
+
+  // Cache behavior:
+  // - Default: keep history but remove from aggregation by archiving out of cursor-cache/.
+  // - purgeCache: delete cache files.
+  const CURSOR_CACHE_ARCHIVE_DIR = path.join(CURSOR_CACHE_DIR, "archive");
+  const ensureCacheArchiveDir = (): void => {
+    ensureCacheDir();
+    if (!fs.existsSync(CURSOR_CACHE_ARCHIVE_DIR)) {
+      fs.mkdirSync(CURSOR_CACHE_ARCHIVE_DIR, { recursive: true, mode: 0o700 });
+    }
+  };
+  const archiveFile = (filePath: string, label: string): void => {
+    ensureCacheArchiveDir();
+    const safeLabel = sanitizeAccountIdForFilename(label);
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const dest = path.join(CURSOR_CACHE_ARCHIVE_DIR, `${safeLabel}-${ts}.csv`);
+    fs.renameSync(filePath, dest);
+  };
+
+  try {
+    migrateCursorCacheFromOldPath();
+    if (fs.existsSync(CURSOR_CACHE_DIR)) {
+      const perAccount = getCursorCacheFilePathForAccount(resolved, false);
+      if (fs.existsSync(perAccount)) {
+        if (options?.purgeCache) {
+          fs.rmSync(perAccount);
+        } else {
+          archiveFile(perAccount, `usage.${resolved}`);
+        }
+      }
+      if (wasActive && fs.existsSync(CURSOR_CACHE_FILE)) {
+        if (options?.purgeCache) {
+          fs.rmSync(CURSOR_CACHE_FILE);
+        } else {
+          archiveFile(CURSOR_CACHE_FILE, `usage.active.${resolved}`);
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  delete store.accounts[resolved];
+
+  const remaining = Object.keys(store.accounts);
+  if (remaining.length === 0) {
+    try {
+      fs.unlinkSync(CURSOR_CREDENTIALS_FILE);
+    } catch {}
+    return { removed: true };
+  }
+
+  if (wasActive) {
+    store.activeAccountId = remaining[0];
+  }
+
+  saveCursorCredentialsStoreInternal(store);
+
+  if (wasActive) {
+    // Best-effort: reconcile usage.csv for the new active account.
+    try {
+      migrateCursorCacheFromOldPath();
+      ensureCacheDir();
+      const nextId = store.activeAccountId;
+      const nextFile = getCursorCacheFilePathForAccount(nextId, false);
+      if (fs.existsSync(nextFile)) {
+        if (fs.existsSync(CURSOR_CACHE_FILE)) {
+          try {
+            fs.rmSync(CURSOR_CACHE_FILE);
+          } catch {}
+        }
+        fs.renameSync(nextFile, CURSOR_CACHE_FILE);
+      }
+      const dupActive = getCursorCacheFilePathForAccount(nextId, false);
+      if (fs.existsSync(CURSOR_CACHE_FILE) && fs.existsSync(dupActive)) {
+        try {
+          fs.rmSync(dupActive);
+        } catch {}
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return { removed: true };
+}
+
 export function clearCursorCredentials(): boolean {
+  // Backward compatible: clears ALL accounts
   try {
     if (fs.existsSync(CURSOR_CREDENTIALS_FILE)) {
       fs.unlinkSync(CURSOR_CREDENTIALS_FILE);
@@ -145,8 +531,50 @@ export function clearCursorCredentials(): boolean {
   }
 }
 
+export function clearCursorCredentialsAndCache(options?: { purgeCache?: boolean }): boolean {
+  const cleared = clearCursorCredentials();
+  if (!cleared) return false;
+
+  try {
+    migrateCursorCacheFromOldPath();
+    if (!fs.existsSync(CURSOR_CACHE_DIR)) return true;
+
+    const archiveDir = path.join(CURSOR_CACHE_DIR, "archive");
+    const ensureArchiveDir = (): void => {
+      ensureCacheDir();
+      if (!fs.existsSync(archiveDir)) {
+        fs.mkdirSync(archiveDir, { recursive: true, mode: 0o700 });
+      }
+    };
+    const archiveFile = (filePath: string, label: string): void => {
+      ensureArchiveDir();
+      const safeLabel = sanitizeAccountIdForFilename(label);
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      const dest = path.join(archiveDir, `${safeLabel}-${ts}.csv`);
+      fs.renameSync(filePath, dest);
+    };
+
+    for (const f of fs.readdirSync(CURSOR_CACHE_DIR)) {
+      if (!f.startsWith("usage") || !f.endsWith(".csv")) continue;
+      const filePath = path.join(CURSOR_CACHE_DIR, f);
+      try {
+        if (options?.purgeCache) {
+          fs.rmSync(filePath);
+        } else {
+          archiveFile(filePath, `usage.all.${f}`);
+        }
+      } catch {}
+    }
+  } catch {
+    // ignore
+  }
+
+  return true;
+}
+
 export function isCursorLoggedIn(): boolean {
-  return loadCursorCredentials() !== null;
+  const store = loadCursorCredentialsStoreInternal();
+  return !!store && Object.keys(store.accounts).length > 0;
 }
 
 // ============================================================================
@@ -394,12 +822,12 @@ export function cursorRowsToMessages(rows: CursorUsageRow[]): CursorMessageWithT
  * Fetch and parse Cursor usage data
  * Requires valid credentials to be stored
  */
-export async function readCursorUsage(): Promise<{
+export async function readCursorUsage(nameOrId?: string): Promise<{
   rows: CursorUsageRow[];
   byModel: CursorUsageData[];
   messages: CursorMessageWithTimestamp[];
 }> {
-  const credentials = loadCursorCredentials();
+  const credentials = loadCursorCredentials(nameOrId);
   if (!credentials) {
     throw new Error("Cursor not authenticated. Run 'tokscale cursor login' first.");
   }
@@ -426,6 +854,12 @@ export function getCursorCredentialsPath(): string {
 const OLD_CURSOR_CACHE_DIR = path.join(os.homedir(), ".tokscale", "cursor-cache");
 const CURSOR_CACHE_DIR = path.join(CONFIG_DIR, "cursor-cache");
 const CURSOR_CACHE_FILE = path.join(CURSOR_CACHE_DIR, "usage.csv");
+
+function getCursorCacheFilePathForAccount(accountId: string, isActive: boolean): string {
+  if (isActive) return CURSOR_CACHE_FILE;
+  const safe = sanitizeAccountIdForFilename(accountId);
+  return path.join(CURSOR_CACHE_DIR, `usage.${safe}.csv`);
+}
 
 function ensureCacheDir(): void {
   if (!fs.existsSync(CURSOR_CACHE_DIR)) {
@@ -461,19 +895,49 @@ function migrateCursorCacheFromOldPath(): void {
  */
 export async function syncCursorCache(): Promise<{ synced: boolean; rows: number; error?: string }> {
   migrateCursorCacheFromOldPath();
-  const credentials = loadCursorCredentials();
-  if (!credentials) {
-    return { synced: false, rows: 0, error: "Not authenticated" };
-  }
+  const store = loadCursorCredentialsStoreInternal();
+  if (!store) return { synced: false, rows: 0, error: "Not authenticated" };
+  const accounts = Object.entries(store.accounts);
+  if (accounts.length === 0) return { synced: false, rows: 0, error: "Not authenticated" };
 
   try {
-    const csvText = await fetchCursorUsageCsv(credentials.sessionToken);
     ensureCacheDir();
-    fs.writeFileSync(CURSOR_CACHE_FILE, csvText, { encoding: "utf-8", mode: 0o600 });
 
-    // Count rows for feedback
-    const rows = parseCursorCsv(csvText);
-    return { synced: true, rows: rows.length };
+    // Ensure we don't double-count active account (usage.csv + usage.<active>.csv)
+    const activeId = store.activeAccountId;
+    if (activeId) {
+      const dup = getCursorCacheFilePathForAccount(activeId, false);
+      if (fs.existsSync(dup)) {
+        try { fs.rmSync(dup); } catch {}
+      }
+    }
+
+    let totalRows = 0;
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const [accountId, credentials] of accounts) {
+      const isActive = accountId === store.activeAccountId;
+      try {
+        const csvText = await fetchCursorUsageCsv(credentials.sessionToken);
+        const filePath = getCursorCacheFilePathForAccount(accountId, isActive);
+        atomicWriteFile(filePath, csvText, 0o600);
+        totalRows += parseCursorCsv(csvText).length;
+        successCount += 1;
+      } catch (e) {
+        errors.push(`${accountId}: ${(e as Error).message}`);
+      }
+    }
+
+    if (successCount === 0) {
+      return { synced: false, rows: 0, error: errors[0] || "Cursor sync failed" };
+    }
+
+    return {
+      synced: true,
+      rows: totalRows,
+      error: errors.length > 0 ? `Some accounts failed to sync (${errors.length}/${accounts.length})` : undefined,
+    };
   } catch (error) {
     return { synced: false, rows: 0, error: (error as Error).message };
   }
@@ -483,6 +947,8 @@ export async function syncCursorCache(): Promise<{ synced: boolean; rows: number
  * Get the cache file path
  */
 export function getCursorCachePath(): string {
+  // Ensure legacy cache is migrated before reporting paths
+  migrateCursorCacheFromOldPath();
   return CURSOR_CACHE_FILE;
 }
 
@@ -490,6 +956,7 @@ export function getCursorCachePath(): string {
  * Check if cache exists and when it was last updated
  */
 export function getCursorCacheStatus(): { exists: boolean; lastModified?: Date; path: string } {
+  migrateCursorCacheFromOldPath();
   const exists = fs.existsSync(CURSOR_CACHE_FILE);
   let lastModified: Date | undefined;
 
@@ -503,6 +970,17 @@ export function getCursorCacheStatus(): { exists: boolean; lastModified?: Date; 
   }
 
   return { exists, lastModified, path: CURSOR_CACHE_FILE };
+}
+
+export function hasCursorUsageCache(): boolean {
+  migrateCursorCacheFromOldPath();
+  try {
+    if (!fs.existsSync(CURSOR_CACHE_DIR)) return false;
+    const files = fs.readdirSync(CURSOR_CACHE_DIR);
+    return files.some((f) => isCursorUsageCsvFilename(f));
+  } catch {
+    return false;
+  }
 }
 
 export interface CursorUnifiedMessage {
@@ -523,36 +1001,61 @@ export interface CursorUnifiedMessage {
 }
 
 export function readCursorMessagesFromCache(): CursorUnifiedMessage[] {
-  if (!fs.existsSync(CURSOR_CACHE_FILE)) {
+  migrateCursorCacheFromOldPath();
+  if (!fs.existsSync(CURSOR_CACHE_DIR)) {
     return [];
   }
 
+  let files: string[];
   try {
-    const csvText = fs.readFileSync(CURSOR_CACHE_FILE, "utf-8");
-    const rows = parseCursorCsv(csvText);
-
-    return rows.map((row) => {
-      const cacheWrite = Math.max(0, row.inputWithCacheWrite - row.inputWithoutCacheWrite);
-      const input = row.inputWithoutCacheWrite;
-
-      return {
-        source: "cursor" as const,
-        modelId: row.model,
-        providerId: inferProvider(row.model),
-        sessionId: `cursor-${row.date}-${row.model}`,
-        timestamp: row.timestamp,
-        date: row.date,
-        tokens: {
-          input,
-          output: row.outputTokens,
-          cacheRead: row.cacheRead,
-          cacheWrite,
-          reasoning: 0,
-        },
-        cost: row.costToYou || row.apiCost,
-      };
-    });
+    files = fs
+      .readdirSync(CURSOR_CACHE_DIR)
+      .filter((f) => isCursorUsageCsvFilename(f));
   } catch {
     return [];
   }
+
+  const store = loadCursorCredentialsStoreInternal();
+  const activeId = store?.activeAccountId;
+
+  const all: CursorUnifiedMessage[] = [];
+  for (const file of files) {
+    const filePath = path.join(CURSOR_CACHE_DIR, file);
+    let accountId = "unknown";
+    if (file === "usage.csv") {
+      accountId = activeId || "active";
+    } else if (file.startsWith("usage.") && file.endsWith(".csv")) {
+      accountId = file.slice("usage.".length, -".csv".length);
+    }
+
+    try {
+      const csvText = fs.readFileSync(filePath, "utf-8");
+      const rows = parseCursorCsv(csvText);
+
+      for (const row of rows) {
+        const cacheWrite = Math.max(0, row.inputWithCacheWrite - row.inputWithoutCacheWrite);
+        const input = row.inputWithoutCacheWrite;
+        all.push({
+          source: "cursor" as const,
+          modelId: row.model,
+          providerId: inferProvider(row.model),
+          sessionId: `cursor-${accountId}-${row.date}-${row.model}`,
+          timestamp: row.timestamp,
+          date: row.date,
+          tokens: {
+            input,
+            output: row.outputTokens,
+            cacheRead: row.cacheRead,
+            cacheWrite,
+            reasoning: 0,
+          },
+          cost: row.costToYou || row.apiCost,
+        });
+      }
+    } catch {
+      // ignore file
+    }
+  }
+
+  return all;
 }

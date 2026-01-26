@@ -16,9 +16,16 @@ import { submit } from "./submit.js";
 import { generateWrapped } from "./wrapped.js";
 
 import {
+  ensureCursorMigration,
   loadCursorCredentials,
   saveCursorCredentials,
   clearCursorCredentials,
+  clearCursorCredentialsAndCache,
+  isCursorLoggedIn,
+  hasCursorUsageCache,
+  listCursorAccounts,
+  setActiveCursorAccount,
+  removeCursorAccount,
   validateCursorSession,
   readCursorUsage,
   getCursorCredentialsPath,
@@ -428,22 +435,69 @@ async function main() {
   cursorCommand
     .command("login")
     .description("Login to Cursor (paste your session token)")
-    .action(async () => {
-      await cursorLogin();
+    .option("--name <name>", "Label for this Cursor account (e.g., work, personal)")
+    .action(async (options: { name?: string }) => {
+      ensureCursorMigration();
+      await cursorLogin(options);
     });
 
   cursorCommand
     .command("logout")
-    .description("Logout from Cursor")
-    .action(async () => {
-      await cursorLogout();
+    .description("Logout from a Cursor account")
+    .option("--name <name>", "Account label or id")
+    .option("--all", "Logout from all Cursor accounts")
+    .option("--purge-cache", "Also delete cached Cursor usage for the logged-out account(s)")
+    .action(async (options: { name?: string; all?: boolean; purgeCache?: boolean }) => {
+      ensureCursorMigration();
+      await cursorLogout(options);
     });
 
   cursorCommand
     .command("status")
     .description("Check Cursor authentication status")
-    .action(async () => {
-      await cursorStatus();
+    .option("--name <name>", "Account label or id")
+    .action(async (options: { name?: string }) => {
+      ensureCursorMigration();
+      await cursorStatus(options);
+    });
+
+  cursorCommand
+    .command("accounts")
+    .description("List saved Cursor accounts")
+    .option("--json", "Output as JSON")
+    .action(async (options: { json?: boolean }) => {
+      ensureCursorMigration();
+      const accounts = listCursorAccounts();
+      if (options.json) {
+        console.log(JSON.stringify({ accounts }, null, 2));
+        return;
+      }
+
+      if (accounts.length === 0) {
+        console.log(pc.yellow("\n  No saved Cursor accounts.\n"));
+        return;
+      }
+
+      console.log(pc.cyan("\n  Cursor IDE - Accounts\n"));
+      for (const acct of accounts) {
+        const name = acct.label ? `${acct.label} ${pc.gray(`(${acct.id})`)}` : acct.id;
+        console.log(`  ${acct.isActive ? pc.green("*") : pc.gray("-")} ${name}`);
+      }
+      console.log();
+    });
+
+  cursorCommand
+    .command("switch")
+    .description("Switch active Cursor account")
+    .argument("<name>", "Account label or id")
+    .action(async (name: string) => {
+      ensureCursorMigration();
+      const result = setActiveCursorAccount(name);
+      if (!result.ok) {
+        console.log(pc.red(`\n  Error: ${result.error}\n`));
+        process.exit(1);
+      }
+      console.log(pc.green(`\n  Active Cursor account set to ${pc.bold(name)}\n`));
     });
 
   // Check if a subcommand was provided
@@ -521,8 +575,7 @@ function getEnabledSources(options: FilterOptions): SourceType[] | undefined {
  * Only attempts sync if user is authenticated with Cursor.
  */
 async function syncCursorData(): Promise<CursorSyncResult> {
-  const credentials = loadCursorCredentials();
-  if (!credentials) {
+  if (!isCursorLoggedIn()) {
     return { attempted: false, synced: false, rows: 0 };
   }
 
@@ -578,8 +631,7 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
 
   // Check cursor auth early if cursor-only mode
   if (onlyCursor) {
-    const credentials = loadCursorCredentials();
-    if (!credentials) {
+    if (!isCursorLoggedIn() && !hasCursorUsageCache()) {
       console.log(pc.red("\n  Error: Cursor authentication required."));
       console.log(pc.gray("  Run 'tokscale cursor login' to authenticate with Cursor.\n"));
       process.exit(1);
@@ -610,6 +662,11 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
     dateFilters,
     (phase) => spinner?.update(phase)
   );
+
+  if (includeCursor && cursorSync.attempted && cursorSync.error) {
+    // Don't block report generation; just warn about partial Cursor sync.
+    console.log(pc.yellow(`  Cursor sync warning: ${cursorSync.error}`));
+  }
   
   if (!localMessages && !onlyCursor) {
     if (spinner) {
@@ -628,7 +685,7 @@ async function showModelReport(options: FilterOptions & DateFilterOptions & { be
     const emptyMessages: ParsedMessages = { messages: [], opencodeCount: 0, claudeCount: 0, codexCount: 0, geminiCount: 0, ampCount: 0, droidCount: 0, processingTimeMs: 0 };
     report = await finalizeReportAsync({
       localMessages: localMessages || emptyMessages,
-      includeCursor: includeCursor && cursorSync.synced,
+      includeCursor: includeCursor && (cursorSync.synced || hasCursorUsageCache()),
       since: dateFilters.since,
       until: dateFilters.until,
       year: dateFilters.year,
@@ -760,7 +817,7 @@ async function showMonthlyReport(options: FilterOptions & DateFilterOptions & { 
   try {
     report = await finalizeMonthlyReportAsync({
       localMessages,
-      includeCursor: includeCursor && cursorSync.synced,
+      includeCursor: includeCursor && (cursorSync.synced || hasCursorUsageCache()),
       since: dateFilters.since,
       until: dateFilters.until,
       year: dateFilters.year,
@@ -859,7 +916,7 @@ async function outputJsonReport(
   if (reportType === "models") {
     const report = await finalizeReportAsync({
       localMessages: localMessages || emptyMessages,
-      includeCursor: includeCursor && cursorSync.synced,
+      includeCursor: includeCursor && (cursorSync.synced || hasCursorUsageCache()),
       since: dateFilters.since,
       until: dateFilters.until,
       year: dateFilters.year,
@@ -868,7 +925,7 @@ async function outputJsonReport(
   } else {
     const report = await finalizeMonthlyReportAsync({
       localMessages: localMessages || emptyMessages,
-      includeCursor: includeCursor && cursorSync.synced,
+      includeCursor: includeCursor && (cursorSync.synced || hasCursorUsageCache()),
       since: dateFilters.since,
       until: dateFilters.until,
       year: dateFilters.year,
@@ -911,7 +968,7 @@ async function handleGraphCommand(options: GraphCommandOptions) {
 
   const data = await finalizeGraphAsync({
     localMessages,
-    includeCursor: includeCursor && cursorSync.synced,
+    includeCursor: includeCursor && (cursorSync.synced || hasCursorUsageCache()),
     since: dateFilters.since,
     until: dateFilters.until,
     year: dateFilters.year,
@@ -1124,14 +1181,7 @@ function getSourceLabel(source: string): string {
 // Cursor IDE Authentication
 // =============================================================================
 
-async function cursorLogin(): Promise<void> {
-  const credentials = loadCursorCredentials();
-  if (credentials) {
-    console.log(pc.yellow("\n  Already logged in to Cursor."));
-    console.log(pc.gray("  Run 'tokscale cursor logout' to sign out first.\n"));
-    return;
-  }
-
+async function cursorLogin(options: { name?: string } = {}): Promise<void> {
   console.log(pc.cyan("\n  Cursor IDE - Login\n"));
   console.log(pc.white("  To get your session token:"));
   console.log(pc.gray("  1. Open https://www.cursor.com/settings in your browser"));
@@ -1169,47 +1219,97 @@ async function cursorLogin(): Promise<void> {
     return;
   }
 
-  // Save credentials
-  saveCursorCredentials({
-    sessionToken: token,
-    createdAt: new Date().toISOString(),
-  });
+  // Save credentials (multi-account)
+  let savedAccountId: string;
+  try {
+    const saved = saveCursorCredentials(
+      {
+        sessionToken: token,
+        createdAt: new Date().toISOString(),
+      },
+      { label: options.name }
+    );
+    savedAccountId = saved.accountId;
+  } catch (e) {
+    console.log(pc.red(`\n  Failed to save credentials: ${(e as Error).message}\n`));
+    return;
+  }
 
   console.log(pc.green("\n  Success! Logged in to Cursor."));
+  if (options.name) {
+    console.log(pc.gray(`  Account: ${options.name} (${savedAccountId})`));
+  } else {
+    console.log(pc.gray(`  Account ID: ${savedAccountId}`));
+  }
   if (validation.membershipType) {
     console.log(pc.gray(`  Membership: ${validation.membershipType}`));
   }
   console.log(pc.gray("  Your usage data will now be included in reports.\n"));
 }
 
-async function cursorLogout(): Promise<void> {
-  const credentials = loadCursorCredentials();
-
-  if (!credentials) {
+async function cursorLogout(options: { name?: string; all?: boolean; purgeCache?: boolean } = {}): Promise<void> {
+  if (!isCursorLoggedIn()) {
     console.log(pc.yellow("\n  Not logged in to Cursor.\n"));
     return;
   }
 
-  const cleared = clearCursorCredentials();
-
-  if (cleared) {
-    console.log(pc.green("\n  Logged out from Cursor.\n"));
-  } else {
+  if (options.all) {
+    const cleared = options.purgeCache ? clearCursorCredentialsAndCache({ purgeCache: true }) : clearCursorCredentialsAndCache();
+    if (cleared) {
+      console.log(pc.green("\n  Logged out from all Cursor accounts.\n"));
+      return;
+    }
     console.error(pc.red("\n  Failed to clear Cursor credentials.\n"));
     process.exit(1);
   }
+
+  const target = options.name || listCursorAccounts().find((a) => a.isActive)?.id;
+  if (!target) {
+    console.log(pc.yellow("\n  No saved Cursor accounts.\n"));
+    return;
+  }
+
+  const removed = removeCursorAccount(target, { purgeCache: options.purgeCache });
+  if (!removed.removed) {
+    console.error(pc.red(`\n  Failed to log out: ${removed.error}\n`));
+    process.exit(1);
+  }
+
+  if (options.purgeCache) {
+    console.log(pc.green(`\n  Logged out from Cursor account (cache purged): ${pc.bold(target)}\n`));
+  } else {
+    console.log(pc.green(`\n  Logged out from Cursor account (history archived): ${pc.bold(target)}\n`));
+  }
 }
 
-async function cursorStatus(): Promise<void> {
-  const credentials = loadCursorCredentials();
-
-  if (!credentials) {
+async function cursorStatus(options: { name?: string } = {}): Promise<void> {
+  if (!isCursorLoggedIn()) {
     console.log(pc.yellow("\n  Not logged in to Cursor."));
     console.log(pc.gray("  Run 'tokscale cursor login' to authenticate.\n"));
     return;
   }
 
+  const accounts = listCursorAccounts();
+  const target = options.name
+    ? options.name
+    : accounts.find((a) => a.isActive)?.id;
+
+  const credentials = target ? loadCursorCredentials(target) : null;
+  if (!credentials) {
+    console.log(pc.red("\n  Error: Cursor account not found."));
+    console.log(pc.gray("  Run 'tokscale cursor accounts' to list saved accounts.\n"));
+    process.exit(1);
+  }
+
   console.log(pc.cyan("\n  Cursor IDE - Status\n"));
+  if (accounts.length > 0) {
+    console.log(pc.white("  Accounts:"));
+    for (const acct of accounts) {
+      const name = acct.label ? `${acct.label} ${pc.gray(`(${acct.id})`)}` : acct.id;
+      console.log(`  ${acct.isActive ? pc.green("*") : pc.gray("-")} ${name}`);
+    }
+    console.log();
+  }
   console.log(pc.gray("  Checking session validity..."));
 
   const validation = await validateCursorSession(credentials.sessionToken);
@@ -1223,7 +1323,7 @@ async function cursorStatus(): Promise<void> {
 
     // Try to fetch usage to show summary
     try {
-      const usage = await readCursorUsage();
+      const usage = await readCursorUsage(target);
       const totalCost = usage.byModel.reduce((sum, m) => sum + m.cost, 0);
       console.log(pc.gray(`  Models used: ${usage.byModel.length}`));
       console.log(pc.gray(`  Total usage events: ${usage.rows.length}`));

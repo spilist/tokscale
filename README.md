@@ -343,16 +343,36 @@ Cursor IDE requires separate authentication via session token (different from th
 
 ```bash
 # Login to Cursor (requires session token from browser)
-tokscale cursor login
+# --name is optional; it just helps you identify accounts later
+tokscale cursor login --name work
 
 # Check Cursor authentication status and session validity
 tokscale cursor status
 
-# Logout from Cursor (removes saved credentials)
-tokscale cursor logout
+# List saved Cursor accounts
+tokscale cursor accounts
+
+# Switch active account (controls which account syncs to cursor-cache/usage.csv)
+tokscale cursor switch work
+
+# Logout from a specific account (keeps history; excludes it from aggregation)
+tokscale cursor logout --name work
+
+# Logout and delete cached usage for that account
+tokscale cursor logout --name work --purge-cache
+
+# Logout from all Cursor accounts (keeps history; excludes from aggregation)
+tokscale cursor logout --all
+
+# Logout from all accounts and delete cached usage
+tokscale cursor logout --all --purge-cache
 ```
 
-**Credentials storage**: Cursor session token is saved to `~/.config/tokscale/cursor-credentials.json`. Usage data is cached at `~/.config/tokscale/cursor-cache/`.
+By default, tokscale **aggregates usage across all saved Cursor accounts** (all `cursor-cache/usage*.csv`).
+
+When you log out, tokscale keeps your cached usage history by moving it to `cursor-cache/archive/` (so it won't be aggregated). Use `--purge-cache` if you want to delete the cached usage instead.
+
+**Credentials storage**: Cursor accounts are stored in `~/.config/tokscale/cursor-credentials.json`. Usage data is cached at `~/.config/tokscale/cursor-cache/` (active account uses `usage.csv`, additional accounts use `usage.<account>.csv`).
 
 **To get your Cursor session token:**
 1. Open https://www.cursor.com/settings in your browser

@@ -339,16 +339,36 @@ Cursor IDEはセッショントークンによる別途認証が必要です（�
 
 ```bash
 # Cursorにログイン（ブラウザからセッショントークンが必要）
-tokscale cursor login
+# --name は任意で、後でアカウントを識別するためのラベルです
+tokscale cursor login --name work
 
 # Cursor認証ステータスとセッションの有効性を確認
 tokscale cursor status
 
-# Cursorからログアウト（保存された資格情報を削除）
-tokscale cursor logout
+# 保存済みのCursorアカウント一覧
+tokscale cursor accounts
+
+# アクティブアカウントを切り替え（cursor-cache/usage.csvに同期されるアカウント）
+tokscale cursor switch work
+
+# 特定アカウントからログアウト（履歴は保持、集計から除外）
+tokscale cursor logout --name work
+
+# ログアウト + そのアカウントのキャッシュ削除
+tokscale cursor logout --name work --purge-cache
+
+# すべてのCursorアカウントからログアウト（履歴は保持、集計から除外）
+tokscale cursor logout --all
+
+# 全アカウントをログアウトしてキャッシュも削除
+tokscale cursor logout --all --purge-cache
 ```
 
-**資格情報の保存**: Cursorセッショントークンは`~/.config/tokscale/cursor-credentials.json`に保存されます。使用量データは`~/.config/tokscale/cursor-cache/`にキャッシュされます。
+**資格情報の保存**: Cursorアカウントは`~/.config/tokscale/cursor-credentials.json`に保存されます。使用量データは`~/.config/tokscale/cursor-cache/`にキャッシュされます（アクティブアカウントは`usage.csv`、追加アカウントは`usage.<account>.csv`）。
+
+デフォルトでは、tokscale は **保存済みのすべての Cursor アカウントの使用量を合算**します（`cursor-cache/usage*.csv`）。後方互換のため、アクティブアカウントは `cursor-cache/usage.csv` に同期されます。
+
+ログアウト時はキャッシュされた履歴を `cursor-cache/archive/` に移動して保持します（そのため集計には含まれません）。完全に削除したい場合は `--purge-cache` を使ってください。
 
 **Cursorセッショントークンの取得方法:**
 1. ブラウザで https://www.cursor.com/settings を開く

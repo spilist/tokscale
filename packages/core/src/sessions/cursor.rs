@@ -1,7 +1,8 @@
 //! Cursor IDE session parser
 //!
 //! Parses CSV files from the Cursor usage export API.
-//! CSV files are cached locally at ~/.config/tokscale/cursor-cache/usage.csv
+//! CSV files are cached locally at ~/.config/tokscale/cursor-cache/*.csv
+//! (legacy single-account cache uses usage.csv; additional accounts may use usage.<account>.csv)
 //!
 //! CSV Format (actual from API):
 //! Date,Kind,Model,Max Mode,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens,Total Tokens,Cost
@@ -9,6 +10,37 @@
 use super::UnifiedMessage;
 use crate::TokenBreakdown;
 use std::path::Path;
+
+fn account_id_from_cursor_cache_path(path: &Path) -> String {
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("usage.csv");
+
+    if file_name == "usage.csv" {
+        return "active".to_string();
+    }
+
+    if let Some(stem) = file_name
+        .strip_prefix("usage.")
+        .and_then(|s| s.strip_suffix(".csv"))
+    {
+        // Keep it simple/ASCII. The CLI already sanitizes file names.
+        let cleaned = stem
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>();
+        return cleaned;
+    }
+
+    "unknown".to_string()
+}
 
 /// Provider inference from model name
 fn infer_provider(model: &str) -> &'static str {
@@ -92,6 +124,8 @@ pub fn parse_cursor_file(path: &Path) -> Vec<UnifiedMessage> {
         (1, 2, 3, 4, 5, 7)
     };
 
+    let account_id = account_id_from_cursor_cache_path(path);
+
     for line in lines {
         if line.trim().is_empty() {
             continue;
@@ -151,7 +185,7 @@ pub fn parse_cursor_file(path: &Path) -> Vec<UnifiedMessage> {
             "cursor",
             model,
             infer_provider(model),
-            date_str.to_string(),
+            format!("cursor-{}-{}", account_id, date_str),
             timestamp,
             TokenBreakdown {
                 input,

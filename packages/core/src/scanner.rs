@@ -90,16 +90,41 @@ pub fn scan_directory(root: &str, pattern: &str) -> Vec<PathBuf> {
 
             let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
+            let is_in_archive_dir = path.components().any(|c| {
+                c.as_os_str()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case("archive")
+            });
+
             match pattern {
                 "*.json" => file_name.ends_with(".json"),
                 "*.jsonl" => file_name.ends_with(".jsonl"),
                 "*.csv" => file_name.ends_with(".csv"),
+                "usage*.csv" => {
+                    if is_in_archive_dir {
+                        return false;
+                    }
+
+                    if file_name == "usage.csv" {
+                        return true;
+                    }
+
+                    // Accept only per-account files: usage.<account>.csv
+                    if !file_name.starts_with("usage.") || !file_name.ends_with(".csv") {
+                        return false;
+                    }
+
+                    // Exclude legacy backups like usage.backup-<ts>.csv
+                    if file_name.starts_with("usage.backup") {
+                        return false;
+                    }
+
+                    true
+                }
                 "session-*.json" => {
                     file_name.starts_with("session-") && file_name.ends_with(".json")
                 }
-                "T-*.json" => {
-                    file_name.starts_with("T-") && file_name.ends_with(".json")
-                }
+                "T-*.json" => file_name.starts_with("T-") && file_name.ends_with(".json"),
                 "*.settings.json" => file_name.ends_with(".settings.json"),
                 _ => false,
             }
@@ -172,7 +197,8 @@ pub fn scan_all_sources(home_dir: &str, sources: &[String]) -> ScanResult {
     if include_cursor {
         // Cursor: ~/.config/tokscale/cursor-cache/*.csv (migrated from ~/.tokscale)
         let cursor_path = format!("{}/.config/tokscale/cursor-cache", home_dir);
-        tasks.push((SessionType::Cursor, cursor_path, "*.csv"));
+        // Only scan Cursor usage CSVs to avoid counting unrelated CSVs.
+        tasks.push((SessionType::Cursor, cursor_path, "usage*.csv"));
     }
 
     if include_amp {

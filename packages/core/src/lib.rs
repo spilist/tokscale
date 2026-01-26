@@ -924,7 +924,7 @@ pub async fn finalize_report(options: FinalizeReportOptions) -> napi::Result<Mod
     // Add Cursor messages if enabled
     if options.include_cursor {
         let cursor_cache_dir = format!("{}/.config/tokscale/cursor-cache", home_dir);
-        let cursor_files = scanner::scan_directory(&cursor_cache_dir, "*.csv");
+        let cursor_files = scanner::scan_directory(&cursor_cache_dir, "usage*.csv");
 
         let cursor_messages: Vec<UnifiedMessage> = cursor_files
             .par_iter()
@@ -1071,7 +1071,7 @@ pub async fn finalize_monthly_report(options: FinalizeMonthlyOptions) -> napi::R
     // Add Cursor messages if enabled
     if options.include_cursor {
         let cursor_cache_dir = format!("{}/.config/tokscale/cursor-cache", home_dir);
-        let cursor_files = scanner::scan_directory(&cursor_cache_dir, "*.csv");
+        let cursor_files = scanner::scan_directory(&cursor_cache_dir, "usage*.csv");
 
         let cursor_messages: Vec<UnifiedMessage> = cursor_files
             .par_iter()
@@ -1203,7 +1203,7 @@ pub async fn finalize_graph(options: FinalizeGraphOptions) -> napi::Result<Graph
     // Add Cursor messages if enabled
     if options.include_cursor {
         let cursor_cache_dir = format!("{}/.config/tokscale/cursor-cache", home_dir);
-        let cursor_files = scanner::scan_directory(&cursor_cache_dir, "*.csv");
+        let cursor_files = scanner::scan_directory(&cursor_cache_dir, "usage*.csv");
 
         let cursor_messages: Vec<UnifiedMessage> = cursor_files
             .par_iter()
@@ -1297,7 +1297,7 @@ pub async fn finalize_report_and_graph(options: FinalizeReportOptions) -> napi::
     // Add Cursor messages if enabled
     if options.include_cursor {
         let cursor_cache_dir = format!("{}/.config/tokscale/cursor-cache", home_dir);
-        let cursor_files = scanner::scan_directory(&cursor_cache_dir, "*.csv");
+        let cursor_files = scanner::scan_directory(&cursor_cache_dir, "usage*.csv");
 
         let cursor_messages: Vec<UnifiedMessage> = cursor_files
             .par_iter()

@@ -29,6 +29,7 @@ pub struct CodexPayload {
     pub model: Option<String>,
     pub model_name: Option<String>,
     pub info: Option<CodexInfo>,
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -68,6 +69,7 @@ pub fn parse_codex_file(path: &Path) -> Vec<UnifiedMessage> {
     // Stateful tracking
     let mut current_model: Option<String> = None;
     let mut previous_totals: Option<(i64, i64, i64)> = None; // (input, output, cached)
+    let mut session_is_headless = false;
 
     for line in reader.lines() {
         let line = match line {
@@ -83,6 +85,15 @@ pub fn parse_codex_file(path: &Path) -> Vec<UnifiedMessage> {
         let mut handled = false;
         let mut bytes = trimmed.as_bytes().to_vec();
         if let Ok(entry) = simd_json::from_slice::<CodexEntry>(&mut bytes) {
+            if entry.entry_type == "session_meta" {
+                if let Some(payload) = entry.payload.as_ref() {
+                    if payload.source.as_deref() == Some("exec") {
+                        session_is_headless = true;
+                    }
+                }
+                handled = true;
+            }
+
             if let Some(payload) = entry.payload {
                 // Extract model from turn_context
                 if entry.entry_type == "turn_context" {
@@ -170,7 +181,13 @@ pub fn parse_codex_file(path: &Path) -> Vec<UnifiedMessage> {
                         .map(|dt| dt.timestamp_millis())
                         .unwrap_or(fallback_timestamp);
 
-                    messages.push(UnifiedMessage::new(
+                    let agent = if session_is_headless {
+                        Some("headless".to_string())
+                    } else {
+                        None
+                    };
+
+                    messages.push(UnifiedMessage::new_with_agent(
                         "codex",
                         model,
                         "openai",
@@ -184,6 +201,7 @@ pub fn parse_codex_file(path: &Path) -> Vec<UnifiedMessage> {
                             reasoning: 0,
                         },
                         0.0, // Cost calculated later
+                        agent,
                     ));
                     handled = true;
                 }
@@ -200,6 +218,10 @@ pub fn parse_codex_file(path: &Path) -> Vec<UnifiedMessage> {
             &mut current_model,
             fallback_timestamp,
         ) {
+            let mut msg = msg;
+            if session_is_headless && msg.agent.is_none() {
+                msg.agent = Some("headless".to_string());
+            }
             messages.push(msg);
         }
     }
@@ -355,5 +377,18 @@ mod tests {
         assert_eq!(messages[0].tokens.input, 45);
         assert_eq!(messages[0].tokens.output, 12);
         assert_eq!(messages[0].tokens.cache_read, 5);
+    }
+
+    #[test]
+    fn test_session_meta_exec_marks_headless() {
+        let line1 = r#"{"timestamp":"2026-01-01T00:00:00Z","type":"session_meta","payload":{"originator":"codex_exec","source":"exec"}}"#;
+        let line2 = r#"{"timestamp":"2026-01-01T00:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":10,"cached_input_tokens":2,"output_tokens":3}}}}"#;
+        let content = format!("{}\n{}", line1, line2);
+        let file = create_test_file(&content);
+
+        let messages = parse_codex_file(file.path());
+
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].agent.as_deref(), Some("headless"));
     }
 }

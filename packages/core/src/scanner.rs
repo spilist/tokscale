@@ -72,6 +72,26 @@ impl ScanResult {
     }
 }
 
+pub fn headless_roots(home_dir: &str) -> Vec<PathBuf> {
+    if let Ok(path) = std::env::var("TOKSCALE_HEADLESS_DIR") {
+        return vec![PathBuf::from(path)];
+    }
+
+    let mut roots = Vec::new();
+    roots.push(PathBuf::from(format!(
+        "{}/.config/tokscale/headless",
+        home_dir
+    )));
+
+    let mac_root = PathBuf::from(format!(
+        "{}/Library/Application Support/tokscale/headless",
+        home_dir
+    ));
+    roots.push(mac_root);
+
+    roots
+}
+
 /// Scan a single directory for session files
 pub fn scan_directory(root: &str, pattern: &str) -> Vec<PathBuf> {
     if !std::path::Path::new(root).exists() {
@@ -146,8 +166,7 @@ pub fn scan_all_sources(home_dir: &str, sources: &[String]) -> ScanResult {
     let include_amp = include_all || sources.iter().any(|s| s == "amp");
     let include_droid = include_all || sources.iter().any(|s| s == "droid");
 
-    let headless_root = std::env::var("TOKSCALE_HEADLESS_DIR")
-        .unwrap_or_else(|_| format!("{}/.config/tokscale/headless", home_dir));
+    let headless_roots = headless_roots(home_dir);
 
     // Define scan tasks
     let mut tasks: Vec<(SessionType, String, &str)> = Vec::new();
@@ -164,11 +183,6 @@ pub fn scan_all_sources(home_dir: &str, sources: &[String]) -> ScanResult {
         // Claude: ~/.claude/projects/**/*.jsonl
         let claude_path = format!("{}/.claude/projects", home_dir);
         tasks.push((SessionType::Claude, claude_path, "*.jsonl"));
-
-        // Claude headless: ~/.config/tokscale/headless/claude/*.{json,jsonl}
-        let claude_headless_path = format!("{}/claude", headless_root);
-        tasks.push((SessionType::Claude, claude_headless_path.clone(), "*.jsonl"));
-        tasks.push((SessionType::Claude, claude_headless_path, "*.json"));
     }
 
     if include_codex {
@@ -178,20 +192,18 @@ pub fn scan_all_sources(home_dir: &str, sources: &[String]) -> ScanResult {
         let codex_path = format!("{}/sessions", codex_home);
         tasks.push((SessionType::Codex, codex_path, "*.jsonl"));
 
-        // Codex headless: ~/.config/tokscale/headless/codex/*.jsonl
-        let codex_headless_path = format!("{}/codex", headless_root);
-        tasks.push((SessionType::Codex, codex_headless_path, "*.jsonl"));
+        // Codex headless: <headless_root>/codex/*.jsonl
+        for root in &headless_roots {
+            let codex_headless_path = root.join("codex");
+            let path = codex_headless_path.to_string_lossy().to_string();
+            tasks.push((SessionType::Codex, path, "*.jsonl"));
+        }
     }
 
     if include_gemini {
         // Gemini: ~/.gemini/tmp/*/chats/session-*.json
         let gemini_path = format!("{}/.gemini/tmp", home_dir);
         tasks.push((SessionType::Gemini, gemini_path, "session-*.json"));
-
-        // Gemini headless: ~/.config/tokscale/headless/gemini/*.{json,jsonl}
-        let gemini_headless_path = format!("{}/gemini", headless_root);
-        tasks.push((SessionType::Gemini, gemini_headless_path.clone(), "*.jsonl"));
-        tasks.push((SessionType::Gemini, gemini_headless_path, "*.json"));
     }
 
     if include_cursor {
@@ -245,7 +257,21 @@ mod tests {
     use super::*;
     use std::fs::{self, File};
     use std::io::Write;
+    use std::sync::{Mutex, OnceLock};
     use tempfile::TempDir;
+
+    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+    }
+
+    fn restore_env(var: &str, previous: Option<String>) {
+        match previous {
+            Some(value) => std::env::set_var(var, value),
+            None => std::env::remove_var(var),
+        }
+    }
 
     #[test]
     fn test_scan_result_total_files() {
@@ -420,6 +446,39 @@ mod tests {
     }
 
     #[test]
+    fn test_headless_roots_default() {
+        let _guard = env_lock();
+        let previous = std::env::var("TOKSCALE_HEADLESS_DIR").ok();
+        std::env::remove_var("TOKSCALE_HEADLESS_DIR");
+
+        let home = "/tmp/tokscale-test-home";
+        let roots = headless_roots(home);
+        let config_root = PathBuf::from(format!("{}/.config/tokscale/headless", home));
+        let mac_root = PathBuf::from(format!(
+            "{}/Library/Application Support/tokscale/headless",
+            home
+        ));
+
+        assert_eq!(roots.len(), 2);
+        assert!(roots.contains(&config_root));
+        assert!(roots.contains(&mac_root));
+
+        restore_env("TOKSCALE_HEADLESS_DIR", previous);
+    }
+
+    #[test]
+    fn test_headless_roots_override() {
+        let _guard = env_lock();
+        let previous = std::env::var("TOKSCALE_HEADLESS_DIR").ok();
+        std::env::set_var("TOKSCALE_HEADLESS_DIR", "/custom/headless");
+
+        let roots = headless_roots("/tmp/home");
+        assert_eq!(roots, vec![PathBuf::from("/custom/headless")]);
+
+        restore_env("TOKSCALE_HEADLESS_DIR", previous);
+    }
+
+    #[test]
     fn test_scan_all_sources_opencode() {
         let dir = TempDir::new().unwrap();
         let home = dir.path();
@@ -474,6 +533,44 @@ mod tests {
         assert_eq!(result.gemini_files.len(), 1);
         assert!(result.opencode_files.is_empty());
         assert!(result.codex_files.is_empty());
+    }
+
+    #[test]
+    fn test_scan_all_sources_headless_paths() {
+        let _guard = env_lock();
+        let previous = std::env::var("TOKSCALE_HEADLESS_DIR").ok();
+        std::env::remove_var("TOKSCALE_HEADLESS_DIR");
+
+        let dir = TempDir::new().unwrap();
+        let home = dir.path();
+
+        let config_root = home
+            .join(".config")
+            .join("tokscale")
+            .join("headless");
+        let mac_root = home
+            .join("Library")
+            .join("Application Support")
+            .join("tokscale")
+            .join("headless");
+
+        fs::create_dir_all(mac_root.join("codex")).unwrap();
+        File::create(mac_root.join("codex").join("codex.jsonl")).unwrap();
+
+        let result = scan_all_sources(
+            home.to_str().unwrap(),
+            &[
+                "claude".to_string(),
+                "codex".to_string(),
+                "gemini".to_string(),
+            ],
+        );
+
+        assert!(result.claude_files.is_empty());
+        assert_eq!(result.codex_files.len(), 1);
+        assert!(result.gemini_files.is_empty());
+
+        restore_env("TOKSCALE_HEADLESS_DIR", previous);
     }
 
     #[test]

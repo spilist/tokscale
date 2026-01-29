@@ -51,7 +51,11 @@ import {
   type ParsedMessages,
 } from "./native.js";
 import { createSpinner } from "./spinner.js";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { performance } from "node:perf_hooks";
 import type { SourceType } from "./graph-types.js";
 import type { TUIOptions, TabType } from "./tui/types/index.js";
@@ -193,6 +197,217 @@ function getDateRangeLabel(options: DateFilterOptions): string | null {
   return null;
 }
 
+function getHeadlessRoots(homeDir: string): string[] {
+  const override = process.env.TOKSCALE_HEADLESS_DIR;
+  if (override && override.trim()) {
+    return [override];
+  }
+
+  const roots = [
+    path.join(homeDir, ".config", "tokscale", "headless"),
+    path.join(homeDir, "Library", "Application Support", "tokscale", "headless"),
+  ];
+
+  return Array.from(new Set(roots));
+}
+
+function describePath(targetPath: string): string {
+  return fs.existsSync(targetPath) ? targetPath : `${targetPath} (missing)`;
+}
+
+type HeadlessFormat = "json" | "jsonl";
+type HeadlessSource = "codex";
+
+const HEADLESS_SOURCES: HeadlessSource[] = ["codex"];
+
+function normalizeHeadlessSource(source: string): HeadlessSource | null {
+  const normalized = source.toLowerCase();
+  return HEADLESS_SOURCES.includes(normalized as HeadlessSource)
+    ? (normalized as HeadlessSource)
+    : null;
+}
+
+function resolveHeadlessFormat(
+  source: HeadlessSource,
+  args: string[],
+  override?: string
+): HeadlessFormat {
+  if (override === "json" || override === "jsonl") {
+    return override;
+  }
+
+  return "jsonl";
+}
+
+function applyHeadlessDefaults(
+  source: HeadlessSource,
+  args: string[],
+  format: HeadlessFormat,
+  autoFlags: boolean
+): string[] {
+  if (!autoFlags) return args;
+
+  const updated = [...args];
+
+  if (source === "codex" && !updated.includes("--json")) {
+    updated.push("--json");
+  }
+
+  return updated;
+}
+
+function buildHeadlessOutputPath(
+  headlessRoots: string[],
+  source: HeadlessSource,
+  format: HeadlessFormat,
+  outputPath?: string
+): string {
+  if (outputPath) {
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    return outputPath;
+  }
+
+  const root = headlessRoots[0] || path.join(os.homedir(), ".config", "tokscale", "headless");
+  const dir = path.join(root, source);
+  fs.mkdirSync(dir, { recursive: true });
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const id = randomUUID().replace(/-/g, "").slice(0, 8);
+  const filename = `${source}-${stamp}-${id}.${format}`;
+  return path.join(dir, filename);
+}
+
+function printHeadlessHelp(): void {
+  console.log("\n  Usage: tokscale headless codex [args...]");
+  console.log("  Options:");
+  console.log("    --format <json|jsonl>   Override output format");
+  console.log("    --output <file>         Write captured output to file");
+  console.log("    --no-auto-flags         Do not auto-add JSON output flags");
+  console.log("\n  Examples:");
+  console.log("    tokscale headless codex exec -m gpt-5");
+  console.log();
+}
+
+async function runHeadlessCapture(argv: string[]): Promise<void> {
+  const sourceArg = argv[1];
+  if (!sourceArg || sourceArg === "--help" || sourceArg === "-h") {
+    printHeadlessHelp();
+    return;
+  }
+
+  const source = normalizeHeadlessSource(sourceArg);
+  if (!source) {
+    console.error(`\n  Error: Unknown headless source '${sourceArg}'.`);
+    printHeadlessHelp();
+    process.exit(1);
+  }
+
+  const rawArgs = argv.slice(2);
+  let outputPath: string | undefined;
+  let formatOverride: HeadlessFormat | undefined;
+  let autoFlags = true;
+  const cmdArgs: string[] = [];
+
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === "--") continue;
+    if ((arg === "--help" || arg === "-h") && cmdArgs.length === 0) {
+      printHeadlessHelp();
+      return;
+    }
+    if (arg === "--output") {
+      const value = rawArgs[i + 1];
+      if (!value) {
+        console.error("\n  Error: --output requires a file path.");
+        process.exit(1);
+      }
+      outputPath = value;
+      i += 1;
+      continue;
+    }
+    if (arg === "--format") {
+      const format = rawArgs[i + 1];
+      if (!format) {
+        console.error("\n  Error: --format requires a value (json or jsonl).");
+        process.exit(1);
+      }
+      if (format !== "json" && format !== "jsonl") {
+        console.error(`\n  Error: Invalid format '${format}'. Use json or jsonl.`);
+        process.exit(1);
+      }
+      formatOverride = format as HeadlessFormat;
+      i += 1;
+      continue;
+    }
+    if (arg === "--no-auto-flags") {
+      autoFlags = false;
+      continue;
+    }
+    cmdArgs.push(arg);
+  }
+
+  if (cmdArgs.length === 0) {
+    console.error("\n  Error: Missing CLI arguments to execute.");
+    printHeadlessHelp();
+    process.exit(1);
+  }
+
+  const format = resolveHeadlessFormat(source, cmdArgs, formatOverride);
+  const finalArgs = applyHeadlessDefaults(source, cmdArgs, format, autoFlags);
+  const headlessRoots = getHeadlessRoots(os.homedir());
+  const output = buildHeadlessOutputPath(headlessRoots, source, format, outputPath);
+
+  console.log(pc.cyan("\n  Headless capture"));
+  console.log(pc.gray(`  source: ${source}`));
+  console.log(pc.gray(`  output: ${output}`));
+  console.log();
+
+  const proc = spawn(source, finalArgs, {
+    stdio: ["inherit", "pipe", "inherit"],
+  });
+
+  if (!proc.stdout) {
+    console.error("\n  Error: Failed to capture stdout from command.");
+    process.exit(1);
+  }
+
+  const outputStream = fs.createWriteStream(output, { encoding: "utf-8" });
+  const outputFinished = new Promise<void>((resolve, reject) => {
+    outputStream.on("finish", () => resolve());
+    outputStream.on("error", reject);
+  });
+  proc.stdout.pipe(outputStream);
+  let exitCode: number;
+  try {
+    exitCode = await new Promise<number>((resolve, reject) => {
+      proc.on("error", reject);
+      proc.on("close", (code) => resolve(code ?? 1));
+    });
+  } catch (err) {
+    outputStream.destroy();
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`\n  Error: Failed to run '${source}': ${message}`);
+    process.exit(1);
+  }
+
+  outputStream.end();
+
+  try {
+    await outputFinished;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`\n  Error: Failed to write headless output: ${message}`);
+    process.exit(1);
+  }
+
+  if (exitCode !== 0) {
+    process.exit(exitCode);
+  }
+
+  console.log(pc.green(`  Saved headless output to ${output}`));
+  console.log();
+}
+
 function buildTUIOptions(
   options: FilterOptions & DateFilterOptions,
   initialTab?: TabType
@@ -288,6 +503,142 @@ async function main() {
         }
       }
     });
+
+  program
+    .command("sources")
+    .description("Show local scan locations and Codex headless paths")
+    .option("--json", "Output as JSON (for scripting)")
+    .action(async (options) => {
+      const homeDir = os.homedir();
+      const headlessRoots = getHeadlessRoots(homeDir);
+
+      const claudeSessions = path.join(homeDir, ".claude", "projects");
+      const codexHome = process.env.CODEX_HOME || path.join(homeDir, ".codex");
+      const codexSessions = path.join(codexHome, "sessions");
+      const geminiSessions = path.join(homeDir, ".gemini", "tmp");
+
+      let localMessages: ParsedMessages | null = null;
+      try {
+        localMessages = await parseLocalSourcesAsync({
+          homeDir,
+          sources: ["claude", "codex", "gemini"],
+        });
+      } catch (e) {
+        console.error(`Error: ${(e as Error).message}`);
+        process.exit(1);
+      }
+
+      const headlessCounts = {
+        codex: 0,
+      };
+
+      for (const message of localMessages.messages) {
+        if (message.agent === "headless" && message.source === "codex") {
+          headlessCounts.codex += 1;
+        }
+      }
+
+      const sourceRows: Array<{
+        source: "claude" | "codex" | "gemini";
+        label: string;
+        sessionsPath: string;
+        messageCount: number;
+        headlessSupported: boolean;
+        headlessPaths: string[];
+        headlessMessageCount: number;
+      }> = [
+        {
+          source: "claude",
+          label: "Claude Code",
+          sessionsPath: claudeSessions,
+          messageCount: localMessages.claudeCount,
+          headlessSupported: false,
+          headlessPaths: [],
+          headlessMessageCount: 0,
+        },
+        {
+          source: "codex",
+          label: "Codex CLI",
+          sessionsPath: codexSessions,
+          headlessPaths: headlessRoots.map((root) => path.join(root, "codex")),
+          messageCount: localMessages.codexCount,
+          headlessMessageCount: headlessCounts.codex,
+          headlessSupported: true,
+        },
+        {
+          source: "gemini",
+          label: "Gemini CLI",
+          sessionsPath: geminiSessions,
+          messageCount: localMessages.geminiCount,
+          headlessSupported: false,
+          headlessPaths: [],
+          headlessMessageCount: 0,
+        },
+      ];
+
+      if (options.json) {
+        const payload = {
+          headlessRoots,
+          sources: sourceRows.map((row) => ({
+            source: row.source,
+            label: row.label,
+            sessionsPath: row.sessionsPath,
+            sessionsPathExists: fs.existsSync(row.sessionsPath),
+            messageCount: row.messageCount,
+            headlessSupported: row.headlessSupported,
+            headlessPaths: row.headlessSupported
+              ? row.headlessPaths.map((headlessPath) => ({
+                  path: headlessPath,
+                  exists: fs.existsSync(headlessPath),
+                }))
+              : [],
+            headlessMessageCount: row.headlessSupported ? row.headlessMessageCount : 0,
+          })),
+          note: "Headless capture is supported for Codex CLI only.",
+        };
+        console.log(JSON.stringify(payload, null, 2));
+        return;
+      }
+
+      console.log(pc.cyan("\n  Local sources & Codex headless capture"));
+      console.log(pc.gray(`  Headless roots: ${headlessRoots.join(", ")}`));
+      console.log();
+
+      for (const row of sourceRows) {
+        console.log(pc.white(`  ${row.label}`));
+        console.log(pc.gray(`  sessions: ${describePath(row.sessionsPath)}`));
+        if (row.headlessSupported) {
+          console.log(
+            pc.gray(
+              `  headless: ${row.headlessPaths.map(describePath).join(", ")}`
+            )
+          );
+          console.log(
+            pc.gray(
+              `  messages: ${formatNumber(row.messageCount)} (headless: ${formatNumber(
+                row.headlessMessageCount
+              )})`
+            )
+          );
+        } else {
+          console.log(pc.gray(`  messages: ${formatNumber(row.messageCount)}`));
+        }
+        console.log();
+      }
+
+      console.log(
+        pc.gray(
+          "  Note: Headless capture is supported for Codex CLI only."
+        )
+      );
+      console.log();
+    });
+
+  program
+    .command("headless")
+    .description("Run a CLI in headless mode and capture stdout")
+    .argument("<source>", "Source CLI to capture (currently only 'codex' is supported)")
+    .argument("[args...]", "Arguments passed to the CLI");
 
   program
     .command("graph")
@@ -502,11 +853,15 @@ async function main() {
 
   // Check if a subcommand was provided
   const args = process.argv.slice(2);
+  if (args[0] === "headless") {
+    await runHeadlessCapture(args);
+    return;
+  }
   const firstArg = args[0] || '';
   // Global flags should go to main program
   const isGlobalFlag = ['--help', '-h', '--version', '-V'].includes(firstArg);
   const hasSubcommand = args.length > 0 && !firstArg.startsWith('-');
-  const knownCommands = ['monthly', 'models', 'graph', 'wrapped', 'login', 'logout', 'whoami', 'submit', 'cursor', 'tui', 'pricing', 'help'];
+  const knownCommands = ['monthly', 'models', 'sources', 'headless', 'graph', 'wrapped', 'login', 'logout', 'whoami', 'submit', 'cursor', 'tui', 'pricing', 'help'];
   const isKnownCommand = hasSubcommand && knownCommands.includes(firstArg);
 
   if (isKnownCommand || isGlobalFlag) {

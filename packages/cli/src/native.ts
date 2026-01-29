@@ -356,6 +356,7 @@ export interface ParsedMessages {
 }
 
 export interface LocalParseOptions {
+  homeDir?: string;
   sources?: SourceType[];
   since?: string;
   until?: string;
@@ -558,7 +559,7 @@ export async function parseLocalSourcesAsync(options: LocalParseOptions): Promis
   }
 
   const nativeOptions: NativeLocalParseOptions = {
-    homeDir: undefined,
+    homeDir: options.homeDir,
     sources: options.sources,
     since: options.since,
     until: options.until,

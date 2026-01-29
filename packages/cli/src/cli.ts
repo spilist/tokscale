@@ -278,7 +278,7 @@ function buildHeadlessOutputPath(
 }
 
 function printHeadlessHelp(): void {
-  console.log("\n  Usage: tokscale headless <codex> [args...]");
+  console.log("\n  Usage: tokscale headless codex [args...]");
   console.log("  Options:");
   console.log("    --format <json|jsonl>   Override output format");
   console.log("    --output <file>         Write captured output to file");
@@ -315,13 +315,22 @@ async function runHeadlessCapture(argv: string[]): Promise<void> {
       printHeadlessHelp();
       return;
     }
-    if (arg === "--output" && rawArgs[i + 1]) {
-      outputPath = rawArgs[i + 1];
+    if (arg === "--output") {
+      const value = rawArgs[i + 1];
+      if (!value) {
+        console.error("\n  Error: --output requires a file path.");
+        process.exit(1);
+      }
+      outputPath = value;
       i += 1;
       continue;
     }
-    if (arg === "--format" && rawArgs[i + 1]) {
+    if (arg === "--format") {
       const format = rawArgs[i + 1];
+      if (!format) {
+        console.error("\n  Error: --format requires a value (json or jsonl).");
+        process.exit(1);
+      }
       if (format !== "json" && format !== "jsonl") {
         console.error(`\n  Error: Invalid format '${format}'. Use json or jsonl.`);
         process.exit(1);
@@ -363,20 +372,33 @@ async function runHeadlessCapture(argv: string[]): Promise<void> {
   }
 
   const outputStream = fs.createWriteStream(output, { encoding: "utf-8" });
-  proc.stdout.pipe(outputStream);
-
-  const exitCode = await new Promise<number>((resolve, reject) => {
-    proc.on("error", reject);
-    proc.on("close", (code) => resolve(code ?? 1));
-  }).catch((err: Error) => {
-    console.error(`\n  Error: Failed to run '${source}': ${err.message}`);
-    process.exit(1);
-  });
-
-  await new Promise<void>((resolve) => {
+  const outputFinished = new Promise<void>((resolve, reject) => {
     outputStream.on("finish", () => resolve());
-    outputStream.end();
+    outputStream.on("error", reject);
   });
+  proc.stdout.pipe(outputStream);
+  let exitCode: number;
+  try {
+    exitCode = await new Promise<number>((resolve, reject) => {
+      proc.on("error", reject);
+      proc.on("close", (code) => resolve(code ?? 1));
+    });
+  } catch (err) {
+    outputStream.destroy();
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`\n  Error: Failed to run '${source}': ${message}`);
+    process.exit(1);
+  }
+
+  outputStream.end();
+
+  try {
+    await outputFinished;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`\n  Error: Failed to write headless output: ${message}`);
+    process.exit(1);
+  }
 
   if (exitCode !== 0) {
     process.exit(exitCode);

@@ -524,7 +524,11 @@ async function main() {
       const ampSessions = path.join(homeDir, ".local", "share", "amp", "threads");
       const droidSessions = path.join(homeDir, ".factory", "sessions");
       const openclawSessions = path.join(homeDir, ".openclaw", "agents");
-      const clawdbotSessions = path.join(homeDir, ".clawdbot", "agents");
+      const openclawLegacyPaths = [
+        path.join(homeDir, ".clawdbot", "agents"),
+        path.join(homeDir, ".moltbot", "agents"),
+        path.join(homeDir, ".moldbot", "agents"),
+      ];
 
       let localMessages: ParsedMessages | null = null;
       try {
@@ -551,7 +555,7 @@ async function main() {
         source: SourceType;
         label: string;
         sessionsPath: string;
-        altSessionsPath?: string;
+        legacyPaths?: string[];
         messageCount: number;
         headlessSupported: boolean;
         headlessPaths: string[];
@@ -624,7 +628,7 @@ async function main() {
           source: "openclaw",
           label: "OpenClaw",
           sessionsPath: openclawSessions,
-          altSessionsPath: clawdbotSessions,
+          legacyPaths: openclawLegacyPaths,
           messageCount: localMessages.openclawCount,
           headlessSupported: false,
           headlessPaths: [],
@@ -640,6 +644,12 @@ async function main() {
             label: row.label,
             sessionsPath: row.sessionsPath,
             sessionsPathExists: fs.existsSync(row.sessionsPath),
+            legacyPaths: row.legacyPaths
+              ? row.legacyPaths.map((legacyPath) => ({
+                  path: legacyPath,
+                  exists: fs.existsSync(legacyPath),
+                }))
+              : [],
             messageCount: row.messageCount,
             headlessSupported: row.headlessSupported,
             headlessPaths: row.headlessSupported
@@ -663,6 +673,11 @@ async function main() {
       for (const row of sourceRows) {
         console.log(pc.white(`  ${row.label}`));
         console.log(pc.gray(`  sessions: ${describePath(row.sessionsPath)}`));
+        if (row.legacyPaths && row.legacyPaths.length > 0) {
+          console.log(
+            pc.gray(`  legacy: ${row.legacyPaths.map(describePath).join(", ")}`)
+          );
+        }
         if (row.headlessSupported) {
           console.log(
             pc.gray(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, memo, useCallback } from "react";
 import { useRouter } from "nextjs-toploader/app";
 import styled from "styled-components";
 import { Pagination, Avatar } from "@primer/react";
@@ -8,6 +8,8 @@ import { CopyIcon, CheckIcon } from "@primer/octicons-react";
 import { TabBar } from "@/components/TabBar";
 import { LeaderboardSkeleton } from "@/components/Skeleton";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { useSettings } from "@/lib/useSettings";
+import { Switch } from "@/components/Switch";
 
 const Section = styled.div`
   margin-bottom: 40px;
@@ -17,10 +19,12 @@ const Title = styled.h1`
   font-size: 30px;
   font-weight: bold;
   margin-bottom: 8px;
+  color: var(--color-fg-default);
 `;
 
 const Description = styled.p`
   margin-bottom: 24px;
+  color: var(--color-fg-muted);
 `;
 
 const StatsGrid = styled.div`
@@ -41,17 +45,24 @@ const StatsGrid = styled.div`
 const StatCard = styled.div`
   flex: 1;
   border-radius: 12px;
-  border: 1px solid;
+  border: 1px solid var(--color-border-default);
   padding: 12px;
+  background-color: var(--color-bg-default);
 `;
 
 const StatLabel = styled.p`
   font-size: 12px;
+  color: var(--color-fg-muted);
 `;
 
 const StatValue = styled.p`
   font-size: 16px;
   font-weight: bold;
+  color: var(--color-fg-default);
+`;
+
+const StatValuePrimary = styled(StatValue)`
+  color: var(--color-primary);
 `;
 
 const TabSection = styled.div`
@@ -60,8 +71,9 @@ const TabSection = styled.div`
 
 const TableContainer = styled.div`
   border-radius: 16px;
-  border: 1px solid;
+  border: 1px solid var(--color-border-default);
   overflow: hidden;
+  background-color: var(--color-bg-default);
 `;
 
 const EmptyState = styled.div`
@@ -71,10 +83,22 @@ const EmptyState = styled.div`
 
 const EmptyMessage = styled.p`
   margin-bottom: 16px;
+  color: var(--color-fg-muted);
 `;
 
 const EmptyHint = styled.p`
   font-size: 14px;
+  color: var(--color-fg-subtle);
+`;
+
+const RetryButton = styled.button`
+  margin-top: 16px;
+  padding: 8px 16px;
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 `;
 
 const CodeSnippet = styled.code`
@@ -83,6 +107,7 @@ const CodeSnippet = styled.code`
   padding-top: 4px;
   padding-bottom: 4px;
   border-radius: 4px;
+  background-color: var(--color-bg-subtle);
 `;
 
 const TableWrapper = styled.div`
@@ -99,7 +124,8 @@ const Table = styled.table`
 `;
 
 const TableHead = styled.thead`
-  border-bottom: 1px solid;
+  border-bottom: 1px solid var(--color-border-default);
+  background-color: var(--color-bg-elevated);
 `;
 
 const TableHeaderCell = styled.th`
@@ -112,6 +138,7 @@ const TableHeaderCell = styled.th`
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  color: var(--color-fg-muted);
   
   @media (max-width: 480px) {
     padding-left: 8px;
@@ -160,20 +187,24 @@ const TableHeaderCell = styled.th`
 
 const TableBody = styled.tbody``;
 
-const TableRow = styled.tr<{ $isCurrentUser?: boolean }>`
+const TableRow = styled.tr`
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
   
   &:hover {
-    background-color: ${props => props.$isCurrentUser ? 'rgba(0, 115, 255, 0.12)' : 'rgba(20, 26, 33, 0.6)'};
+    background-color: rgba(20, 26, 33, 0.6);
   }
 
-  ${props => props.$isCurrentUser && `
+  &[data-current-user="true"] {
     background: rgba(0, 115, 255, 0.05);
     box-shadow: inset 4px 0 0 #0073FF, inset 0 0 0 2px #0073FF;
     border-radius: 4px;
-  `}
+    
+    &:hover {
+      background-color: rgba(0, 115, 255, 0.12);
+    }
+  }
 `;
 
 const TableCell = styled.td`
@@ -232,6 +263,11 @@ const TableCell = styled.td`
 const RankBadge = styled.span`
   font-size: 16px;
   font-weight: bold;
+  color: var(--color-fg-muted);
+  
+  &[data-rank="1"] { color: #EAB308; }
+  &[data-rank="2"] { color: #9CA3AF; }
+  &[data-rank="3"] { color: #D97706; }
   
   @media (max-width: 480px) {
     font-size: 14px;
@@ -271,6 +307,7 @@ const UserDisplayName = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 120px;
+  color: var(--color-fg-default);
   
   @media (max-width: 480px) {
     max-width: 80px;
@@ -288,6 +325,7 @@ const Username = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 120px;
+  color: var(--color-fg-muted);
   
   @media (max-width: 480px) {
     max-width: 80px;
@@ -303,6 +341,7 @@ const Username = styled.p`
 const StatSpan = styled.span`
   font-weight: 500;
   font-size: 14px;
+  color: var(--color-fg-default);
   
   @media (min-width: 640px) {
     font-size: 16px;
@@ -365,12 +404,16 @@ const CostValue = styled.span`
   }
 `;
 
+const SubmitCount = styled.span`
+  color: var(--color-fg-muted);
+`;
+
 const PaginationContainer = styled.div`
   padding-left: 12px;
   padding-right: 12px;
   padding-top: 12px;
   padding-bottom: 12px;
-  border-top: 1px solid;
+  border-top: 1px solid var(--color-border-default);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -389,6 +432,7 @@ const PaginationContainer = styled.div`
 const PaginationText = styled.p`
   font-size: 12px;
   text-align: center;
+  color: var(--color-fg-muted);
   
   @media (min-width: 640px) {
     font-size: 14px;
@@ -400,17 +444,20 @@ const CTASection = styled.div`
   margin-top: 32px;
   padding: 24px;
   border-radius: 16px;
-  border: 1px solid;
+  border: 1px solid var(--color-border-default);
+  background-color: var(--color-bg-default);
 `;
 
 const CTATitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 12px;
+  color: var(--color-fg-default);
 `;
 
 const CTADescription = styled.p`
   margin-bottom: 16px;
+  color: var(--color-fg-muted);
 `;
 
 const CodeBlock = styled.div`
@@ -429,6 +476,7 @@ const CodeLine = styled.div`
   font-size: 16px;
   font-weight: 500;
   letter-spacing: -0.8px;
+  background-color: var(--color-bg-subtle);
 
   * {
     font-family: "Inconsolata", monospace !important;
@@ -578,6 +626,20 @@ const ErrorBanner = styled.div`
   gap: 8px;
 `;
 
+const SortToggleContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+`;
+
+const SortLabel = styled.span`
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  font-weight: 500;
+`;
+
 export type Period = "all" | "month" | "week";
 
 export interface LeaderboardUser {
@@ -609,11 +671,13 @@ export interface LeaderboardData {
     uniqueUsers: number;
   };
   period: Period;
+  sortBy?: 'tokens' | 'cost';
 }
 
 interface LeaderboardClientProps {
   initialData: LeaderboardData;
   currentUser: { id: string; username: string; displayName: string | null; avatarUrl: string | null } | null;
+  initialSortBy: 'tokens' | 'cost';
 }
 
 function isValidLeaderboardData(data: unknown): data is LeaderboardData {
@@ -627,7 +691,74 @@ function isValidLeaderboardData(data: unknown): data is LeaderboardData {
   );
 }
 
-export default function LeaderboardClient({ initialData, currentUser }: LeaderboardClientProps) {
+interface LeaderboardRowProps {
+  user: LeaderboardUser;
+  isCurrentUser: boolean;
+  isLastRow: boolean;
+  onRowClick: (username: string) => void;
+}
+
+const LeaderboardRow = memo(function LeaderboardRow({
+  user,
+  isCurrentUser,
+  isLastRow,
+  onRowClick,
+}: LeaderboardRowProps) {
+  const formattedTokens = useMemo(() => user.totalTokens.toLocaleString('en-US'), [user.totalTokens]);
+  const formattedCost = useMemo(() => user.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }), [user.totalCost]);
+  
+  return (
+    <TableRow
+      onClick={() => onRowClick(user.username)}
+      data-current-user={isCurrentUser}
+      style={isLastRow ? undefined : { borderBottom: "1px solid var(--color-border-default)" }}
+    >
+      <TableCell className="rank-cell">
+        <RankBadge data-rank={user.rank <= 3 ? user.rank : undefined}>
+          #{user.rank}
+        </RankBadge>
+      </TableCell>
+      <TableCell>
+        <UserContainer>
+          <Avatar
+            src={user.avatarUrl || `https://github.com/${user.username}.png`}
+            alt={user.username}
+            size={40}
+          />
+          <UserInfo>
+            <UserDisplayName>
+              {user.displayName || user.username}
+            </UserDisplayName>
+            <Username>
+              @{user.username}
+            </Username>
+          </UserInfo>
+        </UserContainer>
+      </TableCell>
+      <TableCell className="text-right hidden-cost-mobile">
+        <StatSpan title={formattedCost}>
+          {formatCurrency(user.totalCost)}
+        </StatSpan>
+      </TableCell>
+      <TableCell className="text-right">
+        <CombinedValueContainer>
+          <TokenValue title={formattedTokens}>
+            <TokenValueFull>{formattedTokens}</TokenValueFull>
+            <TokenValueAbbrev>{formatNumber(user.totalTokens)}</TokenValueAbbrev>
+          </TokenValue>
+          <CostValue title={formattedCost}>
+            {formatCurrency(user.totalCost)}
+          </CostValue>
+        </CombinedValueContainer>
+      </TableCell>
+      <TableCell className="text-right hidden-mobile w-24">
+        <SubmitCount>{user.submissionCount}</SubmitCount>
+      </TableCell>
+    </TableRow>
+  );
+});
+
+export default function LeaderboardClient({ initialData, currentUser, initialSortBy }: LeaderboardClientProps) {
   const router = useRouter();
   const [data, setData] = useState<LeaderboardData>(initialData);
   const [isLoading, setIsLoading] = useState(false);
@@ -638,7 +769,12 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
   const [currentUserRank, setCurrentUserRank] = useState<LeaderboardUser | null>(null);
   const [currentUserRankError, setCurrentUserRankError] = useState(false);
 
+  const { leaderboardSortBy, setLeaderboardSort, mounted } = useSettings();
+  
+  const effectiveSortBy = mounted ? leaderboardSortBy : initialSortBy;
+
   const isFirstMount = useRef(true);
+  const prevSortByRef = useRef(initialSortBy);
 
   useEffect(() => {
     if (!currentUser) {
@@ -650,7 +786,7 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
     const abortController = new AbortController();
     setCurrentUserRankError(false);
 
-    fetch(`/api/leaderboard/user/${currentUser.username}?period=${period}`, {
+    fetch(`/api/leaderboard/user/${currentUser.username}?period=${period}&sortBy=${effectiveSortBy}`, {
       signal: abortController.signal,
     })
       .then((res) => {
@@ -669,12 +805,12 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
       });
 
     return () => abortController.abort();
-  }, [currentUser, period]);
+  }, [currentUser, period, effectiveSortBy]);
 
-  const fetchData = (targetPeriod: Period, targetPage: number, signal?: AbortSignal) => {
+  const fetchData = (targetPeriod: Period, targetPage: number, targetSortBy: 'tokens' | 'cost', signal?: AbortSignal) => {
     setIsLoading(true);
     setError(null);
-    fetch(`/api/leaderboard?period=${targetPeriod}&page=${targetPage}&limit=50`, { signal })
+    fetch(`/api/leaderboard?period=${targetPeriod}&page=${targetPage}&limit=50&sortBy=${targetSortBy}`, { signal })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -697,13 +833,19 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
   useEffect(() => {
     if (isFirstMount.current) {
       isFirstMount.current = false;
+      prevSortByRef.current = effectiveSortBy;
       return;
     }
 
+    if (effectiveSortBy === prevSortByRef.current && period === initialData.period && page === initialData.pagination.page) {
+      return;
+    }
+    prevSortByRef.current = effectiveSortBy;
+
     const abortController = new AbortController();
-    fetchData(period, page, abortController.signal);
+    fetchData(period, page, effectiveSortBy, abortController.signal);
     return () => abortController.abort();
-  }, [period, page]);
+  }, [period, page, effectiveSortBy, initialData.period, initialData.pagination.page]);
 
   useEffect(() => {
     if (data.pagination.totalPages > 0 && page > data.pagination.totalPages) {
@@ -711,56 +853,38 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
     }
   }, [data.pagination.totalPages, page]);
 
+  const sortedUsers = data.users || [];
+
   const handleCopyCommand = (command: string) => {
     navigator.clipboard.writeText(command);
     setCopiedCommand(command);
     setTimeout(() => setCopiedCommand(null), 2000);
   };
 
+  const handleRowClick = useCallback((username: string) => {
+    router.push(`/u/${username}`);
+  }, [router]);
+
   return (
     <>
       <Section>
-        <Title style={{ color: "var(--color-fg-default)" }}>
-          Leaderboard
-        </Title>
-        <Description style={{ color: "var(--color-fg-muted)" }}>
-          See who&apos;s using the most tokens
-        </Description>
+        <Title>Leaderboard</Title>
+        <Description>See who&apos;s using the most tokens</Description>
 
         <StatsGrid>
-          <StatCard
-            style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-          >
-            <StatLabel style={{ color: "var(--color-fg-muted)" }}>
-              Users
-            </StatLabel>
-            <StatValue style={{ color: "var(--color-fg-default)" }}>
-              {data.stats.uniqueUsers}
-            </StatValue>
+          <StatCard>
+            <StatLabel>Users</StatLabel>
+            <StatValue>{data.stats.uniqueUsers}</StatValue>
           </StatCard>
-          <StatCard
-            style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-          >
-            <StatLabel style={{ color: "var(--color-fg-muted)" }}>
-              Total Tokens
-            </StatLabel>
-            <StatValue
-              style={{ color: "var(--color-primary)", textDecoration: "none" }}
-              title={data.stats.totalTokens.toLocaleString('en-US')}
-            >
+          <StatCard>
+            <StatLabel>Total Tokens</StatLabel>
+            <StatValuePrimary title={data.stats.totalTokens.toLocaleString('en-US')}>
               {formatNumber(data.stats.totalTokens)}
-            </StatValue>
+            </StatValuePrimary>
           </StatCard>
-          <StatCard
-            style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-          >
-            <StatLabel style={{ color: "var(--color-fg-muted)" }}>
-              Total Cost
-            </StatLabel>
-            <StatValue
-              style={{ color: "var(--color-fg-default)", textDecoration: "none" }}
-              title={data.stats.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}
-            >
+          <StatCard>
+            <StatLabel>Total Cost</StatLabel>
+            <StatValue title={data.stats.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}>
               {formatCurrency(data.stats.totalCost)}
             </StatValue>
           </StatCard>
@@ -827,179 +951,67 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
         />
       </TabSection>
 
+      <SortToggleContainer>
+        <SortLabel>Sort by:</SortLabel>
+        <Switch
+          checked={effectiveSortBy === 'cost'}
+          onChange={(checked) => setLeaderboardSort(checked ? 'cost' : 'tokens')}
+          leftLabel="Tokens"
+          rightLabel="Cost"
+        />
+      </SortToggleContainer>
+
       {isLoading ? (
         <LeaderboardSkeleton />
       ) : error ? (
-        <TableContainer
-          style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-        >
+        <TableContainer>
           <EmptyState>
-            <EmptyMessage style={{ color: "var(--color-fg-muted)" }}>
-              Failed to load leaderboard
-            </EmptyMessage>
-            <EmptyHint style={{ color: "var(--color-fg-subtle)" }}>
-              {error}
-            </EmptyHint>
-            <button
-              onClick={() => fetchData(period, page)}
-              style={{
-                marginTop: 16,
-                padding: "8px 16px",
-                backgroundColor: "var(--color-primary)",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
-            >
+            <EmptyMessage>Failed to load leaderboard</EmptyMessage>
+            <EmptyHint>{error}</EmptyHint>
+            <RetryButton onClick={() => fetchData(period, page, effectiveSortBy)}>
               Retry
-            </button>
+            </RetryButton>
           </EmptyState>
         </TableContainer>
       ) : (
-        <TableContainer
-          style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-        >
+        <TableContainer>
           {data.users.length === 0 ? (
             <EmptyState>
-              <EmptyMessage style={{ color: "var(--color-fg-muted)" }}>
-                No submissions yet. Be the first!
-              </EmptyMessage>
-              <EmptyHint style={{ color: "var(--color-fg-subtle)" }}>
-                Run{" "}
-                <CodeSnippet
-                  style={{ backgroundColor: "var(--color-bg-subtle)" }}
-                >
-                  tokscale login && tokscale submit
-                </CodeSnippet>
+              <EmptyMessage>No submissions yet. Be the first!</EmptyMessage>
+              <EmptyHint>
+                Run <CodeSnippet>tokscale login && tokscale submit</CodeSnippet>
               </EmptyHint>
             </EmptyState>
           ) : (
             <>
               <TableWrapper>
                 <Table>
-                  <TableHead
-                    style={{ backgroundColor: "var(--color-bg-elevated)", borderColor: "var(--color-border-default)" }}
-                  >
+                  <TableHead>
                     <tr>
-                      <TableHeaderCell
-                        className="rank-cell"
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        Rank
-                      </TableHeaderCell>
-                      <TableHeaderCell
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        User
-                      </TableHeaderCell>
-                      <TableHeaderCell
-                        className="text-right hidden-cost-mobile"
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        Cost
-                      </TableHeaderCell>
-                      <TableHeaderCell
-                        className="text-right"
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        Tokens
-                      </TableHeaderCell>
-                      <TableHeaderCell
-                        className="text-right hidden-mobile w-24"
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        Submits
-                      </TableHeaderCell>
+                      <TableHeaderCell className="rank-cell">Rank</TableHeaderCell>
+                      <TableHeaderCell>User</TableHeaderCell>
+                      <TableHeaderCell className="text-right hidden-cost-mobile">Cost</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Tokens</TableHeaderCell>
+                      <TableHeaderCell className="text-right hidden-mobile w-24">Submits</TableHeaderCell>
                     </tr>
                   </TableHead>
                   <TableBody>
-                    {data.users.map((user, index) => {
-                      const isCurrentUser = !!(currentUser && user.username === currentUser.username);
-                      return (
-                        <TableRow
-                          key={user.userId}
-                          onClick={() => router.push(`/u/${user.username}`)}
-                          $isCurrentUser={isCurrentUser}
-                          style={{
-                            borderBottom: index < data.users.length - 1 ? "1px solid var(--color-border-default)" : "none",
-                          }}
-                        >
-                        <TableCell className="rank-cell">
-                          <RankBadge
-                            style={{
-                              color:
-                                user.rank === 1
-                                  ? "#EAB308"
-                                  : user.rank === 2
-                                  ? "#9CA3AF"
-                                  : user.rank === 3
-                                  ? "#D97706"
-                                  : "var(--color-fg-muted)",
-                            }}
-                          >
-                            #{user.rank}
-                          </RankBadge>
-                        </TableCell>
-                        <TableCell>
-                          <UserContainer>
-                            <Avatar
-                              src={user.avatarUrl || `https://github.com/${user.username}.png`}
-                              alt={user.username}
-                              size={40}
-                            />
-                            <UserInfo>
-                              <UserDisplayName
-                                style={{ color: "var(--color-fg-default)" }}
-                              >
-                                {user.displayName || user.username}
-                              </UserDisplayName>
-                              <Username
-                                style={{ color: "var(--color-fg-muted)" }}
-                              >
-                                @{user.username}
-                              </Username>
-                            </UserInfo>
-                          </UserContainer>
-                        </TableCell>
-                        <TableCell className="text-right hidden-cost-mobile">
-                          <StatSpan
-                            style={{ color: "var(--color-fg-default)", textDecoration: "none" }}
-                            title={user.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}
-                          >
-                            {formatCurrency(user.totalCost)}
-                          </StatSpan>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <CombinedValueContainer>
-                            <TokenValue
-                              title={user.totalTokens.toLocaleString('en-US')}
-                            >
-                              <TokenValueFull>{user.totalTokens.toLocaleString('en-US')}</TokenValueFull>
-                              <TokenValueAbbrev>{formatNumber(user.totalTokens)}</TokenValueAbbrev>
-                            </TokenValue>
-                            <CostValue
-                              title={user.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}
-                            >
-                              {formatCurrency(user.totalCost)}
-                            </CostValue>
-                          </CombinedValueContainer>
-                        </TableCell>
-                        <TableCell className="text-right hidden-mobile w-24">
-                          <span style={{ color: "var(--color-fg-muted)" }}>{user.submissionCount}</span>
-                        </TableCell>
-                      </TableRow>
-                      );
-                    })}
+                    {sortedUsers.map((user, index) => (
+                      <LeaderboardRow
+                        key={user.userId}
+                        user={user}
+                        isCurrentUser={!!(currentUser && user.username === currentUser.username)}
+                        isLastRow={index === sortedUsers.length - 1}
+                        onRowClick={handleRowClick}
+                      />
+                    ))}
                   </TableBody>
                 </Table>
               </TableWrapper>
 
               {data.pagination.totalPages > 1 && (
-                <PaginationContainer
-                  style={{ borderColor: "var(--color-border-default)" }}
-                >
-                  <PaginationText style={{ color: "var(--color-fg-muted)" }}>
+                <PaginationContainer>
+                  <PaginationText>
                     Showing {(data.pagination.page - 1) * data.pagination.limit + 1}-
                     {Math.min(data.pagination.page * data.pagination.limit, data.pagination.totalUsers)} of{" "}
                     {data.pagination.totalUsers}
@@ -1017,17 +1029,11 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
         </TableContainer>
       )}
 
-      <CTASection
-        style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-      >
-        <CTATitle style={{ color: "var(--color-fg-default)" }}>
-          Join the Leaderboard
-        </CTATitle>
-        <CTADescription style={{ color: "var(--color-fg-muted)" }}>
-          Install Tokscale CLI and submit your usage data:
-        </CTADescription>
+      <CTASection>
+        <CTATitle>Join the Leaderboard</CTATitle>
+        <CTADescription>Install Tokscale CLI and submit your usage data:</CTADescription>
         <CodeBlock>
-          <CodeLine style={{ backgroundColor: "var(--color-bg-subtle)" }}>
+          <CodeLine>
             <CommandPrompt>$</CommandPrompt>
             <CommandPrefix>bunx</CommandPrefix>
             <CommandName>tokscale</CommandName>
@@ -1040,7 +1046,7 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
               {copiedCommand === "bunx tokscale login" ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
             </CopyIconButton>
           </CodeLine>
-          <CodeLine style={{ backgroundColor: "var(--color-bg-subtle)" }}>
+          <CodeLine>
             <CommandPrompt>$</CommandPrompt>
             <CommandPrefix>bunx</CommandPrefix>
             <CommandName>tokscale</CommandName>

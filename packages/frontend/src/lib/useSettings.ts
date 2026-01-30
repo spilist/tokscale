@@ -3,16 +3,30 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ColorPaletteName } from "./themes";
 import { DEFAULT_PALETTE } from "./themes";
+import { 
+  type LeaderboardSortBy,
+  SORT_BY_COOKIE_NAME,
+  isValidSortBy 
+} from "./leaderboard/constants";
+
+export type { LeaderboardSortBy };
 
 export interface Settings {
   paletteName: ColorPaletteName;
+  leaderboardSortBy: LeaderboardSortBy;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   paletteName: DEFAULT_PALETTE,
+  leaderboardSortBy: 'tokens',
 };
 
 const STORAGE_KEY = "tokscale-settings";
+
+function setSortByCookie(sortBy: LeaderboardSortBy): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${SORT_BY_COOKIE_NAME}=${sortBy}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+}
 
 function getStoredSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
@@ -23,6 +37,9 @@ function getStoredSettings(): Settings {
       const parsed = JSON.parse(stored);
       return {
         paletteName: parsed.paletteName || DEFAULT_SETTINGS.paletteName,
+        leaderboardSortBy: isValidSortBy(parsed.leaderboardSortBy) 
+          ? parsed.leaderboardSortBy 
+          : DEFAULT_SETTINGS.leaderboardSortBy,
       };
     }
   } catch {
@@ -49,16 +66,15 @@ function applyDarkModeToDocument(): void {
 }
 
 export function useSettings() {
-  const [settings, setSettings] = useState<Settings>(() => {
-    if (typeof window === "undefined") return DEFAULT_SETTINGS;
-    return getStoredSettings();
-  });
-
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const mountedRef = useRef(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     applyDarkModeToDocument();
+    const stored = getStoredSettings();
+    setSettings(stored);
+    setSortByCookie(stored.leaderboardSortBy);
     mountedRef.current = true;
     setMounted(true);
   }, []);
@@ -71,9 +87,20 @@ export function useSettings() {
     });
   }, []);
 
+  const setLeaderboardSort = useCallback((sortBy: LeaderboardSortBy) => {
+    setSettings((prev) => {
+      const newSettings = { ...prev, leaderboardSortBy: sortBy };
+      saveSettings(newSettings);
+      setSortByCookie(sortBy);
+      return newSettings;
+    });
+  }, []);
+
   return {
     paletteName: settings.paletteName,
     setPalette,
+    leaderboardSortBy: settings.leaderboardSortBy,
+    setLeaderboardSort,
     mounted,
   };
 }

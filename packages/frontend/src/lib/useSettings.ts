@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { ColorPaletteName } from "./themes";
 import { DEFAULT_PALETTE } from "./themes";
 import { 
-  type LeaderboardSortBy, 
-  SORT_BY_COOKIE_NAME, 
+  type LeaderboardSortBy,
+  SORT_BY_COOKIE_NAME,
   isValidSortBy 
 } from "./leaderboard/constants";
 

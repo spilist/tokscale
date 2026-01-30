@@ -19,10 +19,12 @@ const Title = styled.h1`
   font-size: 30px;
   font-weight: bold;
   margin-bottom: 8px;
+  color: var(--color-fg-default);
 `;
 
 const Description = styled.p`
   margin-bottom: 24px;
+  color: var(--color-fg-muted);
 `;
 
 const StatsGrid = styled.div`
@@ -43,17 +45,24 @@ const StatsGrid = styled.div`
 const StatCard = styled.div`
   flex: 1;
   border-radius: 12px;
-  border: 1px solid;
+  border: 1px solid var(--color-border-default);
   padding: 12px;
+  background-color: var(--color-bg-default);
 `;
 
 const StatLabel = styled.p`
   font-size: 12px;
+  color: var(--color-fg-muted);
 `;
 
 const StatValue = styled.p`
   font-size: 16px;
   font-weight: bold;
+  color: var(--color-fg-default);
+`;
+
+const StatValuePrimary = styled(StatValue)`
+  color: var(--color-primary);
 `;
 
 const TabSection = styled.div`
@@ -62,8 +71,9 @@ const TabSection = styled.div`
 
 const TableContainer = styled.div`
   border-radius: 16px;
-  border: 1px solid;
+  border: 1px solid var(--color-border-default);
   overflow: hidden;
+  background-color: var(--color-bg-default);
 `;
 
 const EmptyState = styled.div`
@@ -73,10 +83,22 @@ const EmptyState = styled.div`
 
 const EmptyMessage = styled.p`
   margin-bottom: 16px;
+  color: var(--color-fg-muted);
 `;
 
 const EmptyHint = styled.p`
   font-size: 14px;
+  color: var(--color-fg-subtle);
+`;
+
+const RetryButton = styled.button`
+  margin-top: 16px;
+  padding: 8px 16px;
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
 `;
 
 const CodeSnippet = styled.code`
@@ -85,6 +107,7 @@ const CodeSnippet = styled.code`
   padding-top: 4px;
   padding-bottom: 4px;
   border-radius: 4px;
+  background-color: var(--color-bg-subtle);
 `;
 
 const TableWrapper = styled.div`
@@ -101,7 +124,8 @@ const Table = styled.table`
 `;
 
 const TableHead = styled.thead`
-  border-bottom: 1px solid;
+  border-bottom: 1px solid var(--color-border-default);
+  background-color: var(--color-bg-elevated);
 `;
 
 const TableHeaderCell = styled.th`
@@ -114,6 +138,7 @@ const TableHeaderCell = styled.th`
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  color: var(--color-fg-muted);
   
   @media (max-width: 480px) {
     padding-left: 8px;
@@ -282,6 +307,7 @@ const UserDisplayName = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 120px;
+  color: var(--color-fg-default);
   
   @media (max-width: 480px) {
     max-width: 80px;
@@ -299,6 +325,7 @@ const Username = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 120px;
+  color: var(--color-fg-muted);
   
   @media (max-width: 480px) {
     max-width: 80px;
@@ -314,6 +341,7 @@ const Username = styled.p`
 const StatSpan = styled.span`
   font-weight: 500;
   font-size: 14px;
+  color: var(--color-fg-default);
   
   @media (min-width: 640px) {
     font-size: 16px;
@@ -376,12 +404,16 @@ const CostValue = styled.span`
   }
 `;
 
+const SubmitCount = styled.span`
+  color: var(--color-fg-muted);
+`;
+
 const PaginationContainer = styled.div`
   padding-left: 12px;
   padding-right: 12px;
   padding-top: 12px;
   padding-bottom: 12px;
-  border-top: 1px solid;
+  border-top: 1px solid var(--color-border-default);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -400,6 +432,7 @@ const PaginationContainer = styled.div`
 const PaginationText = styled.p`
   font-size: 12px;
   text-align: center;
+  color: var(--color-fg-muted);
   
   @media (min-width: 640px) {
     font-size: 14px;
@@ -411,17 +444,20 @@ const CTASection = styled.div`
   margin-top: 32px;
   padding: 24px;
   border-radius: 16px;
-  border: 1px solid;
+  border: 1px solid var(--color-border-default);
+  background-color: var(--color-bg-default);
 `;
 
 const CTATitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 12px;
+  color: var(--color-fg-default);
 `;
 
 const CTADescription = styled.p`
   margin-bottom: 16px;
+  color: var(--color-fg-muted);
 `;
 
 const CodeBlock = styled.div`
@@ -440,6 +476,7 @@ const CodeLine = styled.div`
   font-size: 16px;
   font-weight: 500;
   letter-spacing: -0.8px;
+  background-color: var(--color-bg-subtle);
 
   * {
     font-family: "Inconsolata", monospace !important;
@@ -688,20 +725,17 @@ const LeaderboardRow = memo(function LeaderboardRow({
             size={40}
           />
           <UserInfo>
-            <UserDisplayName style={{ color: "var(--color-fg-default)" }}>
+            <UserDisplayName>
               {user.displayName || user.username}
             </UserDisplayName>
-            <Username style={{ color: "var(--color-fg-muted)" }}>
+            <Username>
               @{user.username}
             </Username>
           </UserInfo>
         </UserContainer>
       </TableCell>
       <TableCell className="text-right hidden-cost-mobile">
-        <StatSpan
-          style={{ color: "var(--color-fg-default)", textDecoration: "none" }}
-          title={formattedCost}
-        >
+        <StatSpan title={formattedCost}>
           {formatCurrency(user.totalCost)}
         </StatSpan>
       </TableCell>
@@ -717,7 +751,7 @@ const LeaderboardRow = memo(function LeaderboardRow({
         </CombinedValueContainer>
       </TableCell>
       <TableCell className="text-right hidden-mobile w-24">
-        <span style={{ color: "var(--color-fg-muted)" }}>{user.submissionCount}</span>
+        <SubmitCount>{user.submissionCount}</SubmitCount>
       </TableCell>
     </TableRow>
   );
@@ -824,47 +858,23 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
   return (
     <>
       <Section>
-        <Title style={{ color: "var(--color-fg-default)" }}>
-          Leaderboard
-        </Title>
-        <Description style={{ color: "var(--color-fg-muted)" }}>
-          See who&apos;s using the most tokens
-        </Description>
+        <Title>Leaderboard</Title>
+        <Description>See who&apos;s using the most tokens</Description>
 
         <StatsGrid>
-          <StatCard
-            style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-          >
-            <StatLabel style={{ color: "var(--color-fg-muted)" }}>
-              Users
-            </StatLabel>
-            <StatValue style={{ color: "var(--color-fg-default)" }}>
-              {data.stats.uniqueUsers}
-            </StatValue>
+          <StatCard>
+            <StatLabel>Users</StatLabel>
+            <StatValue>{data.stats.uniqueUsers}</StatValue>
           </StatCard>
-          <StatCard
-            style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-          >
-            <StatLabel style={{ color: "var(--color-fg-muted)" }}>
-              Total Tokens
-            </StatLabel>
-            <StatValue
-              style={{ color: "var(--color-primary)", textDecoration: "none" }}
-              title={data.stats.totalTokens.toLocaleString('en-US')}
-            >
+          <StatCard>
+            <StatLabel>Total Tokens</StatLabel>
+            <StatValuePrimary title={data.stats.totalTokens.toLocaleString('en-US')}>
               {formatNumber(data.stats.totalTokens)}
-            </StatValue>
+            </StatValuePrimary>
           </StatCard>
-          <StatCard
-            style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-          >
-            <StatLabel style={{ color: "var(--color-fg-muted)" }}>
-              Total Cost
-            </StatLabel>
-            <StatValue
-              style={{ color: "var(--color-fg-default)", textDecoration: "none" }}
-              title={data.stats.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}
-            >
+          <StatCard>
+            <StatLabel>Total Cost</StatLabel>
+            <StatValue title={data.stats.totalCost.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })}>
               {formatCurrency(data.stats.totalCost)}
             </StatValue>
           </StatCard>
@@ -944,87 +954,35 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
       {isLoading ? (
         <LeaderboardSkeleton />
       ) : error ? (
-        <TableContainer
-          style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-        >
+        <TableContainer>
           <EmptyState>
-            <EmptyMessage style={{ color: "var(--color-fg-muted)" }}>
-              Failed to load leaderboard
-            </EmptyMessage>
-            <EmptyHint style={{ color: "var(--color-fg-subtle)" }}>
-              {error}
-            </EmptyHint>
-            <button
-              onClick={() => fetchData(period, page, leaderboardSortBy)}
-              style={{
-                marginTop: 16,
-                padding: "8px 16px",
-                backgroundColor: "var(--color-primary)",
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
-            >
+            <EmptyMessage>Failed to load leaderboard</EmptyMessage>
+            <EmptyHint>{error}</EmptyHint>
+            <RetryButton onClick={() => fetchData(period, page, leaderboardSortBy)}>
               Retry
-            </button>
+            </RetryButton>
           </EmptyState>
         </TableContainer>
       ) : (
-        <TableContainer
-          style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-        >
+        <TableContainer>
           {data.users.length === 0 ? (
             <EmptyState>
-              <EmptyMessage style={{ color: "var(--color-fg-muted)" }}>
-                No submissions yet. Be the first!
-              </EmptyMessage>
-              <EmptyHint style={{ color: "var(--color-fg-subtle)" }}>
-                Run{" "}
-                <CodeSnippet
-                  style={{ backgroundColor: "var(--color-bg-subtle)" }}
-                >
-                  tokscale login && tokscale submit
-                </CodeSnippet>
+              <EmptyMessage>No submissions yet. Be the first!</EmptyMessage>
+              <EmptyHint>
+                Run <CodeSnippet>tokscale login && tokscale submit</CodeSnippet>
               </EmptyHint>
             </EmptyState>
           ) : (
             <>
               <TableWrapper>
                 <Table>
-                  <TableHead
-                    style={{ backgroundColor: "var(--color-bg-elevated)", borderColor: "var(--color-border-default)" }}
-                  >
+                  <TableHead>
                     <tr>
-                      <TableHeaderCell
-                        className="rank-cell"
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        Rank
-                      </TableHeaderCell>
-                      <TableHeaderCell
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        User
-                      </TableHeaderCell>
-                      <TableHeaderCell
-                        className="text-right hidden-cost-mobile"
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        Cost
-                      </TableHeaderCell>
-                      <TableHeaderCell
-                        className="text-right"
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        Tokens
-                      </TableHeaderCell>
-                      <TableHeaderCell
-                        className="text-right hidden-mobile w-24"
-                        style={{ color: "var(--color-fg-muted)" }}
-                      >
-                        Submits
-                      </TableHeaderCell>
+                      <TableHeaderCell className="rank-cell">Rank</TableHeaderCell>
+                      <TableHeaderCell>User</TableHeaderCell>
+                      <TableHeaderCell className="text-right hidden-cost-mobile">Cost</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Tokens</TableHeaderCell>
+                      <TableHeaderCell className="text-right hidden-mobile w-24">Submits</TableHeaderCell>
                     </tr>
                   </TableHead>
                   <TableBody>
@@ -1042,10 +1000,8 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
               </TableWrapper>
 
               {data.pagination.totalPages > 1 && (
-                <PaginationContainer
-                  style={{ borderColor: "var(--color-border-default)" }}
-                >
-                  <PaginationText style={{ color: "var(--color-fg-muted)" }}>
+                <PaginationContainer>
+                  <PaginationText>
                     Showing {(data.pagination.page - 1) * data.pagination.limit + 1}-
                     {Math.min(data.pagination.page * data.pagination.limit, data.pagination.totalUsers)} of{" "}
                     {data.pagination.totalUsers}
@@ -1063,17 +1019,11 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
         </TableContainer>
       )}
 
-      <CTASection
-        style={{ backgroundColor: "var(--color-bg-default)", borderColor: "var(--color-border-default)" }}
-      >
-        <CTATitle style={{ color: "var(--color-fg-default)" }}>
-          Join the Leaderboard
-        </CTATitle>
-        <CTADescription style={{ color: "var(--color-fg-muted)" }}>
-          Install Tokscale CLI and submit your usage data:
-        </CTADescription>
+      <CTASection>
+        <CTATitle>Join the Leaderboard</CTATitle>
+        <CTADescription>Install Tokscale CLI and submit your usage data:</CTADescription>
         <CodeBlock>
-          <CodeLine style={{ backgroundColor: "var(--color-bg-subtle)" }}>
+          <CodeLine>
             <CommandPrompt>$</CommandPrompt>
             <CommandPrefix>bunx</CommandPrefix>
             <CommandName>tokscale</CommandName>
@@ -1086,7 +1036,7 @@ export default function LeaderboardClient({ initialData, currentUser }: Leaderbo
               {copiedCommand === "bunx tokscale login" ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
             </CopyIconButton>
           </CodeLine>
-          <CodeLine style={{ backgroundColor: "var(--color-bg-subtle)" }}>
+          <CodeLine>
             <CommandPrompt>$</CommandPrompt>
             <CommandPrefix>bunx</CommandPrefix>
             <CommandName>tokscale</CommandName>

@@ -51,7 +51,7 @@
 | <img width="48px" src=".github/assets/client-cursor.jpg" alt="Cursor" /> | [Cursor IDE](https://cursor.com/) | API sync via `~/.config/tokscale/cursor-cache/` | ✅ Yes |
 | <img width="48px" src=".github/assets/client-amp.png" alt="Amp" /> | [Amp (AmpCode)](https://ampcode.com/) | `~/.local/share/amp/threads/` | ✅ Yes |
 | <img width="48px" src=".github/assets/client-droid.png" alt="Droid" /> | [Droid (Factory Droid)](https://factory.ai/) | `~/.factory/sessions/` | ✅ Yes |
-| <img width="48px" src=".github/assets/client-openclaw.jpg" alt="OpenClaw" /> | [OpenClaw](https://openclaw.ai/) | `~/.openclaw/agents/` or `~/.clawdbot/agents/` | ✅ Yes |
+| <img width="48px" src=".github/assets/client-openclaw.jpg" alt="OpenClaw" /> | [OpenClaw](https://openclaw.ai/) | `~/.openclaw/agents/` (+ legacy: `.clawdbot`, `.moltbot`, `.moldbot`) | ✅ Yes |
 
 Get real-time pricing calculations using [🚅 LiteLLM's pricing data](https://github.com/BerriAI/litellm), with support for tiered pricing models and cache token discounts.
 
@@ -767,7 +767,7 @@ AI coding tools store their session data in cross-platform locations. Most tools
 | Amp | `~/.local/share/amp/` | `%USERPROFILE%\.local\share\amp\` | Uses `xdg-basedir` like OpenCode |
 | Cursor | API sync | API sync | Data fetched via API, cached in `%USERPROFILE%\.config\tokscale\cursor-cache\` |
 | Droid | `~/.factory/` | `%USERPROFILE%\.factory\` | Same path on all platforms |
-| OpenClaw | `~/.openclaw/` or `~/.clawdbot/` | `%USERPROFILE%\.openclaw\` or `%USERPROFILE%\.clawdbot\` | Same path on all platforms |
+| OpenClaw | `~/.openclaw/` (+ legacy: `.clawdbot`, `.moltbot`, `.moldbot`) | `%USERPROFILE%\.openclaw\` (+ legacy paths) | Same path on all platforms |
 
 > **Note**: On Windows, `~` expands to `%USERPROFILE%` (e.g., `C:\Users\YourName`). These tools intentionally use Unix-style paths (like `.local/share`) even on Windows for cross-platform consistency, rather than Windows-native paths like `%APPDATA%`.
 
@@ -910,7 +910,7 @@ Cursor data is fetched from the Cursor API using your session token and cached l
 
 ### OpenClaw
 
-Location: `~/.openclaw/agents/*/sessions/sessions.json` or `~/.clawdbot/agents/*/sessions/sessions.json`
+Location: `~/.openclaw/agents/*/sessions/sessions.json` (also scans legacy paths: `~/.clawdbot/`, `~/.moltbot/`, `~/.moldbot/`)
 
 Index file pointing to JSONL session files:
 ```json

@@ -236,10 +236,16 @@ pub fn scan_all_sources(home_dir: &str, sources: &[String]) -> ScanResult {
     }
 
     if include_openclaw {
+        // Current path
         let openclaw_path = format!("{}/.openclaw/agents", home_dir);
         tasks.push((SessionType::OpenClaw, openclaw_path, "sessions.json"));
+        // Legacy paths (Clawd -> Moltbot -> OpenClaw rebrand history)
         let clawdbot_path = format!("{}/.clawdbot/agents", home_dir);
         tasks.push((SessionType::OpenClaw, clawdbot_path, "sessions.json"));
+        let moltbot_path = format!("{}/.moltbot/agents", home_dir);
+        tasks.push((SessionType::OpenClaw, moltbot_path, "sessions.json"));
+        let moldbot_path = format!("{}/.moldbot/agents", home_dir);
+        tasks.push((SessionType::OpenClaw, moldbot_path, "sessions.json"));
     }
 
     // Execute scans in parallel

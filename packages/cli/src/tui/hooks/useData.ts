@@ -21,6 +21,7 @@ import {
 } from "../../native.js";
 
 import { syncCursorCache, isCursorLoggedIn, hasCursorUsageCache } from "../../cursor.js";
+import { formatLocalDate } from "../../dateUtils.js";
 import { getModelColor } from "../utils/colors.js";
 import { loadCachedData, saveCachedData, isCacheStale, loadSettings } from "../config/settings.js";
 
@@ -47,7 +48,7 @@ function buildContributionGrid(contributions: ContributionDay[]): GridCell[][] {
   const grid: GridCell[][] = Array.from({ length: 7 }, () => []);
 
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = formatLocalDate(today);
   
   const startDate = new Date(today);
   startDate.setDate(startDate.getDate() - 364);
@@ -273,7 +274,7 @@ async function loadData(
   
   const sortedDates = dailyEntries.map(d => d.date).sort();
   if (sortedDates.length > 0) {
-    const todayParts = new Date().toISOString().split("T")[0].split("-").map(Number);
+    const todayParts = formatLocalDate(new Date()).split("-").map(Number);
     const todayUTC = Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]);
     
     let streak = 0;

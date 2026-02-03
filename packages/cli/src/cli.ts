@@ -14,6 +14,7 @@ import pc from "picocolors";
 import { login, logout, whoami } from "./auth.js";
 import { submit } from "./submit.js";
 import { generateWrapped } from "./wrapped.js";
+import { formatLocalDate } from "./dateUtils.js";
 
 import {
   ensureCursorMigration,
@@ -59,7 +60,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { performance } from "node:perf_hooks";
 import type { SourceType } from "./graph-types.js";
-import type { TUIOptions, TabType } from "./tui/types/index.js";
+import type { TUIOptions, TabType, SortType } from "./tui/types/index.js";
 import { loadSettings } from "./tui/config/settings.js";
 
 type LaunchTUIFunction = (options?: TUIOptions) => Promise<void>;
@@ -149,7 +150,7 @@ interface CursorSyncResult {
 // =============================================================================
 
 function formatDate(date: Date): string {
-  return date.toISOString().split("T")[0];
+  return formatLocalDate(date);
 }
 
 function getDateFilters(options: DateFilterOptions): { since?: string; until?: string; year?: string } {
@@ -411,15 +412,17 @@ async function runHeadlessCapture(argv: string[]): Promise<void> {
 }
 
 function buildTUIOptions(
-  options: FilterOptions & DateFilterOptions,
+  options: FilterOptions & DateFilterOptions & { sort?: string },
   initialTab?: TabType
 ): TUIOptions {
   const dateFilters = getDateFilters(options);
   const enabledSources = getEnabledSources(options);
 
   return {
-    initialTab,
+    initialTab: initialTab ?? (options.sort === "date" ? "daily" : undefined),
     enabledSources: enabledSources as TUIOptions["enabledSources"],
+    sortBy: options.sort as SortType | undefined,
+    sortDesc: options.sort ? true : undefined,
     since: dateFilters.since,
     until: dateFilters.until,
     year: dateFilters.year,
@@ -433,6 +436,8 @@ async function main() {
     .name("tokscale")
     .description("Tokscale - Track AI coding costs across OpenCode, Claude Code, Codex, Gemini, Cursor, and Amp")
     .version(pkg.version);
+
+  const sortOption = () => new Option("--sort <column>", "Initial sort column for TUI").choices(["date", "cost", "tokens"]);
 
   program
     .command("monthly")
@@ -455,6 +460,7 @@ async function main() {
     .option("--year <year>", "Filter to specific year")
     .option("--benchmark", "Show processing time")
     .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
+    .addOption(sortOption())
     .action(async (options) => {
       if (options.json) {
         await outputJsonReport("monthly", options);
@@ -492,6 +498,7 @@ async function main() {
     .option("--year <year>", "Filter to specific year")
     .option("--benchmark", "Show processing time")
     .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
+    .addOption(sortOption())
     .action(async (options) => {
       if (options.json) {
         await outputJsonReport("models", options);
@@ -836,6 +843,7 @@ async function main() {
     .option("--since <date>", "Start date (YYYY-MM-DD)")
     .option("--until <date>", "End date (YYYY-MM-DD)")
     .option("--year <year>", "Filter to specific year")
+    .addOption(sortOption())
     .action(async (options) => {
       const launchTUI = await tryLoadTUI();
       if (launchTUI) {
@@ -996,6 +1004,7 @@ async function main() {
       .option("--year <year>", "Filter to specific year")
       .option("--benchmark", "Show processing time")
       .option("--no-spinner", "Disable spinner (for AI agents and scripts - keeps stdout clean)")
+      .addOption(sortOption())
       .parse();
     
     const opts = defaultProgram.opts();

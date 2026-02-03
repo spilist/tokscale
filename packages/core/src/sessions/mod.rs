@@ -141,11 +141,11 @@ impl UnifiedMessage {
     }
 }
 
-/// Convert Unix milliseconds timestamp to YYYY-MM-DD date string
+/// Convert Unix milliseconds timestamp to YYYY-MM-DD date string (local timezone)
 fn timestamp_to_date(timestamp_ms: i64) -> String {
-    use chrono::{TimeZone, Utc};
+    use chrono::{Local, TimeZone};
 
-    let datetime = Utc.timestamp_millis_opt(timestamp_ms);
+    let datetime = Local.timestamp_millis_opt(timestamp_ms);
     match datetime {
         chrono::LocalResult::Single(dt) => dt.format("%Y-%m-%d").to_string(),
         _ => String::new(),
@@ -155,57 +155,94 @@ fn timestamp_to_date(timestamp_ms: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
+
+    extern "C" {
+        fn tzset();
+    }
+
+    /// Run a closure with the TZ environment variable set, then restore it.
+    fn with_tz<F: FnOnce()>(tz: &str, f: F) {
+        std::env::set_var("TZ", tz);
+        // Force libc to re-read TZ
+        unsafe { tzset(); }
+        f();
+    }
 
     #[test]
+    #[serial]
     fn test_timestamp_to_date() {
-        // 2025-06-16 12:00:00 UTC (1750075200 seconds since epoch)
-        let ts = 1750075200000_i64;
-        let date = timestamp_to_date(ts);
-        assert_eq!(date, "2025-06-16");
+        with_tz("UTC", || {
+            // 2025-06-16 12:00:00 UTC (1750075200 seconds since epoch)
+            let ts = 1750075200000_i64;
+            let date = timestamp_to_date(ts);
+            assert_eq!(date, "2025-06-16");
+        });
     }
 
     #[test]
+    #[serial]
     fn test_timestamp_to_date_epoch() {
-        // Unix epoch: 1970-01-01
-        let ts = 0_i64;
-        let date = timestamp_to_date(ts);
-        assert_eq!(date, "1970-01-01");
+        with_tz("UTC", || {
+            // Unix epoch: 1970-01-01
+            let ts = 0_i64;
+            let date = timestamp_to_date(ts);
+            assert_eq!(date, "1970-01-01");
+        });
     }
 
     #[test]
+    #[serial]
     fn test_timestamp_to_date_recent() {
-        // 2024-12-01 00:00:00 UTC
-        let ts = 1733011200000_i64;
-        let date = timestamp_to_date(ts);
-        assert_eq!(date, "2024-12-01");
+        with_tz("UTC", || {
+            // 2024-12-01 00:00:00 UTC
+            let ts = 1733011200000_i64;
+            let date = timestamp_to_date(ts);
+            assert_eq!(date, "2024-12-01");
+        });
     }
 
     #[test]
+    #[serial]
+    fn test_timestamp_to_date_local_timezone() {
+        with_tz("Asia/Seoul", || {
+            // UTC 2025-06-16 23:00 = KST 2025-06-17 08:00
+            // If the implementation uses UTC this would return "2025-06-16".
+            let ts = 1750111200000_i64;
+            let date = timestamp_to_date(ts);
+            assert_eq!(date, "2025-06-17");
+        });
+    }
+
+    #[test]
+    #[serial]
     fn test_unified_message_creation() {
-        let tokens = TokenBreakdown {
-            input: 100,
-            output: 50,
-            cache_read: 0,
-            cache_write: 0,
-            reasoning: 0,
-        };
+        with_tz("UTC", || {
+            let tokens = TokenBreakdown {
+                input: 100,
+                output: 50,
+                cache_read: 0,
+                cache_write: 0,
+                reasoning: 0,
+            };
 
-        let msg = UnifiedMessage::new(
-            "opencode",
-            "claude-3-5-sonnet",
-            "anthropic",
-            "test-session-id",
-            1733011200000,
-            tokens,
-            0.05,
-        );
+            let msg = UnifiedMessage::new(
+                "opencode",
+                "claude-3-5-sonnet",
+                "anthropic",
+                "test-session-id",
+                1733011200000,
+                tokens,
+                0.05,
+            );
 
-        assert_eq!(msg.source, "opencode");
-        assert_eq!(msg.model_id, "claude-3-5-sonnet");
-        assert_eq!(msg.session_id, "test-session-id");
-        assert_eq!(msg.date, "2024-12-01");
-        assert_eq!(msg.cost, 0.05);
-        assert_eq!(msg.agent, None);
+            assert_eq!(msg.source, "opencode");
+            assert_eq!(msg.model_id, "claude-3-5-sonnet");
+            assert_eq!(msg.session_id, "test-session-id");
+            assert_eq!(msg.date, "2024-12-01");
+            assert_eq!(msg.cost, 0.05);
+            assert_eq!(msg.agent, None);
+        });
     }
 
     #[test]

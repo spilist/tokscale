@@ -5,13 +5,14 @@ import { ModelRow } from "./ModelRow.js";
 import type { TUIData, SortType } from "../hooks/useData.js";
 import { formatCost } from "../utils/format.js";
 import { isNarrow, isVeryNarrow } from "../utils/responsive.js";
+import { formatLocalDate } from "../../dateUtils.js";
 
 const CHART_MAX_DAYS = 60;
 
 function getDateDaysAgo(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().split("T")[0];
+  return formatLocalDate(date);
 }
 
 interface OverviewViewProps {

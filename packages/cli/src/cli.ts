@@ -31,6 +31,7 @@ import {
   getCursorCredentialsPath,
   syncCursorCache,
 } from "./cursor.js";
+import { setupSync, removeSync, syncStatus } from "./sync.js";
 import {
   createUsageTable,
   formatUsageRow,
@@ -927,6 +928,36 @@ async function main() {
       console.log(pc.green(`\n  Active Cursor account set to ${pc.bold(name)}\n`));
     });
 
+  // =========================================================================
+  // Automatic Sync Commands
+  // =========================================================================
+
+  const syncCommand = program
+    .command("sync")
+    .description("Automatic sync commands (crontab/Task Scheduler)");
+
+  syncCommand
+    .command("setup")
+    .description("Set up hourly automatic submission")
+    .option("--interval <minutes>", "Sync interval in minutes (default: 60)", "60")
+    .action(async (options) => {
+      await setupSync({ interval: options.interval });
+    });
+
+  syncCommand
+    .command("remove")
+    .description("Remove automatic sync")
+    .action(async () => {
+      await removeSync();
+    });
+
+  syncCommand
+    .command("status")
+    .description("Check sync status")
+    .action(async () => {
+      await syncStatus();
+    });
+
   // Check if a subcommand was provided
   const args = process.argv.slice(2);
   if (args[0] === "headless") {
@@ -937,7 +968,7 @@ async function main() {
   // Global flags should go to main program
   const isGlobalFlag = ['--help', '-h', '--version', '-V'].includes(firstArg);
   const hasSubcommand = args.length > 0 && !firstArg.startsWith('-');
-  const knownCommands = ['monthly', 'models', 'sources', 'headless', 'graph', 'wrapped', 'login', 'logout', 'whoami', 'submit', 'cursor', 'tui', 'pricing', 'help'];
+  const knownCommands = ['monthly', 'models', 'sources', 'headless', 'graph', 'wrapped', 'login', 'logout', 'whoami', 'submit', 'cursor', 'sync', 'tui', 'pricing', 'help'];
   const isKnownCommand = hasSubcommand && knownCommands.includes(firstArg);
 
   if (isKnownCommand || isGlobalFlag) {
